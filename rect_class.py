@@ -1,96 +1,104 @@
 import random
+from calc_circ_area import is_number  # Custom function for checking if a value is a number
 
-from calc_circ_area import is_number # it is strange that there is no standard function for checking isnumber
-
-# for testing we use global variables to compare them when the rectangle size changes
+# Global variables for testing rectangle size changes
 old_width = None
 old_height = None
 
+
 class Rectangle:
-    '''
+    """
     The class describes a rectangle with a given height and width.
 
-    The class provide the following methods:
+    The class provides the following methods:
+        - __init__(self, width, height): Constructor that accepts the width and height of the rectangle.
+        - area(self): Returns the area of the rectangle.
+        - perimeter(self): Returns the perimeter of the rectangle.
+        - is_square(self): Returns True if the rectangle is a square (width equals height), False otherwise.
+        - resize(self, new_width, new_height): Changes the width and height of the rectangle by taking new values.
+    """
 
-    __init__(self, width, height) — a constructor that accepts the width and height of the rectangle.
-
-    area(self) - a method that returns the area of the rectangle.
-
-    perimeter(self) - a method that returns the perimeter of the rectangle.
-
-    is_square(self) - a method that returns True if the rectangle is a square (width equals height), and False otherwise.
-
-    resize(self, new_width, new_height) - a method that changes the width and height of the rectangle by taking new values.
-
-    '''
-    def __init__(self, width, height):
-        # initialization the rectangle with a given height and width
+    def __init__(self, width: float, height: float):
+        """Initialize the rectangle with a given width and height."""
         self.width = width
         self.height = height
 
-    def area(self):
-        # returns the area of the rectangle
+    def area(self) -> float:
+        """Return the area of the rectangle."""
         return self.width * self.height
 
-    def perimeter(self):
-        # returns the perimeter of the rectangle
+    def perimeter(self) -> float:
+        """Return the perimeter of the rectangle."""
         return 2 * (self.width + self.height)
 
-    def is_square(self):
-        # returns the True / False for the statement is the rectangle a square
+    def is_square(self) -> bool:
+        """Return True if the rectangle is a square, False otherwise."""
         return self.width == self.height
 
-    def resize(self, new_width, new_height):
-        # use the global variables for further testing
+    def resize(self, new_width: float, new_height: float):
+        """
+        Resize the rectangle by changing its width and height.
+
+        Args:
+            new_width (float): The new width of the rectangle.
+            new_height (float): The new height of the rectangle.
+        """
         global old_width, old_height
         old_width = self.width
         old_height = self.height
-        # returns the new size of rectangle
         self.width = new_width
         self.height = new_height
 
 
 def test_func(func, calculating, *args):
+    """
+    Test a function and compare its result with the expected value.
+
+    Args:
+        func (Callable): The function to test.
+        calculating: The expected result.
+        *args: Arguments to pass to the function.
+    """
     try:
-        result = func(*args)  # call the function with arguments
+        result = func(*args)
         if result == calculating:
-            print("Rectangle", func.__name__, "is", result, "as expected")
+            print(f"Rectangle {func.__name__} is {result} as expected.")
         else:
-            print("Something wrong with the function", func.__name__, "the calculation should show", result)
+            print(f"Something wrong with the function {func.__name__}. Expected: {calculating}, Got: {result}")
     except Exception as err:
-        print("Some error with the function", func.__name__, ":", err)
+        print(f"Some error with the function {func.__name__}: {err}")
 
-if __name__ == "__main__": # this is a protection against execution in case of import of functions
-    # requesting width and height from the user
-    wh = input('Enter the width and height of rectangle (positive numbers with a space)): ')
 
-    # splitting the parts of request if user inputs
+if __name__ == "__main__":
+    # Request width and height from the user
+    wh = input("Enter the width and height of the rectangle (positive numbers separated by a space): ")
     parts = wh.split()
 
-    # first check for amount of splitted parts and are they numbers
+    # Check if input is valid
     if len(parts) == 2 and is_number(parts[0]) and is_number(parts[1]):
-        # splitting an input string and converting values to numbers
-        width, height = map(float, wh.split())
+        width, height = map(float, parts)
 
-        # checking the correctness of values
         if width > 0 and height > 0:
-            # create an object of the Rectangle class
+            # Create a Rectangle object
             rectangle = Rectangle(width, height)
 
-            # test all methods
+            # Test all methods
             test_func(rectangle.area, calculating=width * height)
             test_func(rectangle.perimeter, calculating=2 * (width + height))
             test_func(rectangle.is_square, width == height)
-            # for future we can use getattr to promote scalability, and some other ways to get all methods in class to test
-            # for resize method need some other approaches
-            rectangle.resize(float(random.randint(1, 9)), float(random.randint(1, 9))) # first we randomly resize the rectangle
-            if not(rectangle.width == old_width and rectangle.height == old_height):
-                print("Old width =", old_width,"\nAfter resize width =", rectangle.width)
-                print("Old height =", old_height,"\nAfter resize height =", rectangle.height)
+
+            # Test the resize method
+            rectangle.resize(float(random.randint(1, 9)), float(random.randint(1, 9)))
+            if not (rectangle.width == old_width and rectangle.height == old_height):
+                print(f"Old width = {old_width}, After resize width = {rectangle.width}")
+                print(f"Old height = {old_height}, After resize height = {rectangle.height}")
             else:
-                print("Something wrong with the function Resize: expected width =", rectangle.width, "expected height =", rectangle.height,
-                                        "but got width =", old_width, "height =", old_height)
+                print(
+                    f"Something wrong with the function Resize: "
+                    f"expected width = {rectangle.width}, expected height = {rectangle.height}, "
+                    f"but got width = {old_width}, height = {old_height}"
+                )
         else:
             print("Both width and height must be positive numbers.")
     else:
-        print("Both width and height must be positive numbers.")
+        print("Invalid input. Please enter two positive numbers separated by a space.")
