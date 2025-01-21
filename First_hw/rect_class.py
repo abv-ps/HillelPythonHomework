@@ -1,5 +1,5 @@
 import random
-from calc_circ_area import is_number  # Custom function for checking if a value is a number
+from First_hw.calc_circ_area import is_number  # Custom function for checking if a value is a number
 
 # Global variables for testing rectangle size changes
 old_width = None
