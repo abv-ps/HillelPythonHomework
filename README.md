@@ -25,3 +25,16 @@ Create an object of the Rectangle class and test all the methods.
 Submit a file with the code or a link to a repository (GitHub, GitLab, etc.).
 
 Complete each task number in a separate file.
+
+Second homework is:
+
+Task 1: Checking object types and attributes
+
+1) Write a function analyze_object(obj) that takes any object and outputs: 
+
+The type of the object.
+A list of all methods and attributes of the object.
+The type of each attribute.
+
+2) Implement a call_function(obj, method_name, *args) function that takes an object, a method name as a string, 
+and any arguments for this method. The function must call the corresponding object method and return the result.

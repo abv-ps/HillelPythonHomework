@@ -23,8 +23,7 @@ class LoggingMeta(type):
         Returns:
             type: The newly created class.
         """
-        new_cls = super().__new__(cls, name, bases, dct)
-        return new_cls
+        return super().__new__(cls, name, bases, dct)
 
     def __init__(cls, name: str, bases: tuple, dct: dict) -> None:
         """
@@ -37,6 +36,7 @@ class LoggingMeta(type):
         """
         super().__init__(name, bases, dct)
 
+        # Wrap __getattribute__ and __setattr__
         original_getattribute = cls.__getattribute__
         original_setattr = cls.__setattr__
 
@@ -69,4 +69,4 @@ if __name__ == "__main__":
     obj = MyClass("Python")       # Logging: modified attribute 'name' with value 'Python'
     print(obj.name)               # Logging: accessed attribute 'name'
     obj.name = "New Python"       # Logging: modified attribute 'name' with value 'New Python'
-    print(obj.name)               # Logging: accessed attribute 'name'
+
