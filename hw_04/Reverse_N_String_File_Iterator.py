@@ -18,7 +18,7 @@ class ReversedNStringFileIterator:
         self.file_name: str = file_name
         self.n: int = n
         self.encoding: str = encoding
-        self.buffer: deque[str] = deque(maxlen=n)  # буфер для зберігання останніх N рядків
+        self.buffer: deque[str] = deque(maxlen=n)  # Buffer for storing the last N lines
         self.lines_read: int = 0
 
     def __iter__(self) -> Iterator[str]:
@@ -54,9 +54,9 @@ class ReversedNStringFileIterator:
         Reads lines from the file and adds them to the buffer in reverse order.
         """
         with open(self.file_name, 'r', encoding=self.encoding, errors='replace') as file:
-            # Читання файлу по рядках
+            # Reads a file line by line
             for line in file:
-                self.buffer.append(line.strip())  # додаємо рядок до буфера
+                self.buffer.append(line.strip())  # Add a string to the buffer
 
 # Example usage
 file_iterator = ReversedNStringFileIterator("some2.txt", n=10)
