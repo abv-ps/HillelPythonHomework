@@ -59,7 +59,7 @@ class ReversedNStringFileIterator:
                 self.buffer.append(line.strip())  # Add a string to the buffer
 
 # Example usage
-file_iterator = ReversedNStringFileIterator("some2.txt", n=10)
+file_iterator = ReversedNStringFileIterator("some.txt", n=10)
 
 for line in file_iterator:
     print(line)

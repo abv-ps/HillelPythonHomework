@@ -78,8 +78,8 @@ def get_directory_from_user() -> str:
     Returns:
         str: The chosen folder path.
     """
-    default_path = os.getcwd()
-    user_input = input(f"Enter the folder path (default: {default_path}): ").strip()
+    default_path: str = os.getcwd()
+    user_input: str = input(f"Enter the folder path (default: {default_path}): ").strip()
     return user_input if user_input else default_path
 
 
@@ -96,7 +96,7 @@ def save_metadata_to_csv(folder_path: str, output_csv: str, file_ext: list[str])
 
     # Open the CSV file for writing
     with open(output_csv, mode='w', newline='', encoding='utf-8') as csvfile:
-        fieldnames = ['filename', 'width', 'height', 'format', 'mode']
+        fieldnames: list[str] = ['filename', 'width', 'height', 'format', 'mode']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
         # Write header
@@ -107,16 +107,15 @@ def save_metadata_to_csv(folder_path: str, output_csv: str, file_ext: list[str])
             writer.writerow(img_metadata)
 
 
+if __name__ == "__main__":
+    dir_name: str = get_directory_from_user()  # Get the folder path from the user
+    input_ext = input("Enter img extensions separated by commas (like '.jpg,.png') or tap enter for default '.jpg': ").strip()
 
-dir_name = get_directory_from_user()  # Get the folder path from the user
-input_ext = input("Enter img extensions separated by commas (like '.jpg,.png') or tap enter for default '.jpg': ").strip()
+    if input_ext:
+        input_ext = [ext.strip() for ext in input_ext.split(',')]
+    else:
+        input_ext = ['.jpg']
 
-if input_ext:
-    input_ext = [ext.strip() for ext in input_ext.split(',')]
-else:
-    input_ext = ['.jpg']
+    output_csv_path = os.path.join(dir_name, 'image_metadata.csv')
 
-output_csv_filename = 'image_metadata.csv'
-output_csv_path = os.path.join(dir_name, output_csv_filename)
-
-save_metadata_to_csv(dir_name, output_csv_path, input_ext)
+    save_metadata_to_csv(dir_name, output_csv_path, input_ext)

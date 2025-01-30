@@ -74,7 +74,7 @@ def get_directory_from_user() -> str:
     """
     default_path = os.getcwd()
     user_input = input(f"Enter the directory path (default: {default_path}): ").strip()
-    return user_input if user_input else default_path
+    return user_input or default_path
 
 
 if __name__ == "__main__":
