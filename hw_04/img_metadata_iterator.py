@@ -9,35 +9,37 @@ class FolderImgIterator:
     Iterator for iterating over files in a given directory with specified file extensions.
     """
 
-    def __init__(self, folderPath: str, file_ext: list[str] = ['.jpg']) -> None:
+    def __init__(self, folder_path: str, file_ext: list[str] = None) -> None:
         """
         Initializes the iterator.
 
         Args:
-            folderPath (str): The path to the folder to iterate over.
-            file_ext (list[str]): The file extensions to filter images (e.g., ['.jpg', '.png']). Defaults to ['.jpg'].
+            folder_path (str): The path to the folder to iterate over.
+            file_ext (list[str]): The file extensions to filter images (like ['.jpg', '.png']). Defaults to ['.jpg'].
 
         Raises:
             ValueError: If the provided path is not a valid folder.
         """
-        if not os.path.isdir(folderPath):
-            raise ValueError(f"The path '{folderPath}' is not a valid directory.")
+        if file_ext is None:
+            file_ext = ['.jpg']
+        if not os.path.isdir(folder_path):
+            raise ValueError(f"The path '{folder_path}' is not a valid directory.")
 
-        self.folderPath: str = folderPath
-        self.file_ext: list[str] = [ext.lower() for ext in file_ext]
-        self.files: list[str] = os.listdir(folderPath)
+        self.folderPath: str = folder_path
+        self.file_ext: list[str] = [ext.strip().lower() for ext in file_ext]
+        self.files: list[str] = os.listdir(folder_path)
         self.index: int = 0
 
-    def __iter__(self) -> Iterator[str]:
+    def __iter__(self) -> Iterator[dict]:
         """
         Returns the iterator object.
 
         Returns:
-            Iterator[str]: The iterator itself.
+            Iterator[dict]: The iterator itself.
         """
         return self
 
-    def __next__(self) -> str:
+    def __next__(self) -> dict:
         """
         Returns the next file's metadata (name, size, format) for image files.
 
@@ -64,7 +66,8 @@ class FolderImgIterator:
                         }
                         return metadata
                 except Exception as e:
-                    return f"Error processing image '{file_name}': {e}"
+                    print(f"Error processing image '{file_name}': {e}")
+                    continue
         raise StopIteration
 
 
@@ -80,16 +83,16 @@ def get_directory_from_user() -> str:
     return user_input if user_input else default_path
 
 
-def save_metadata_to_csv(folderPath: str, output_csv: str, file_ext: list[str] = ['.jpg']) -> None:
+def save_metadata_to_csv(folder_path: str, output_csv: str, file_ext: list[str]) -> None:
     """
     Saves image metadata from all images in the folder to a CSV file.
 
     Args:
-        folderPath (str): The folder containing image files.
+        folder_path (str): The folder containing image files.
         output_csv (str): The path to the output CSV file.
         file_ext (list[str]): The file extensions to filter images. Defaults to ['.jpg'].
     """
-    iterator = FolderImgIterator(folderPath, file_ext)
+    iterator = FolderImgIterator(folder_path, file_ext)
 
     # Open the CSV file for writing
     with open(output_csv, mode='w', newline='', encoding='utf-8') as csvfile:
@@ -105,15 +108,15 @@ def save_metadata_to_csv(folderPath: str, output_csv: str, file_ext: list[str] =
 
 
 
-folderPath = get_directory_from_user()  # Get the folder path from the user
-file_ext = input("Enter img extensions separated by commas (like '.jpg,.png') or tap enter for default '.jpg': ").strip()
+dir_name = get_directory_from_user()  # Get the folder path from the user
+input_ext = input("Enter img extensions separated by commas (like '.jpg,.png') or tap enter for default '.jpg': ").strip()
 
-if file_ext:
-    file_ext = [ext.strip() for ext in file_ext.split(',')]
+if input_ext:
+    input_ext = [ext.strip() for ext in input_ext.split(',')]
 else:
-    file_ext = ['.jpg']
+    input_ext = ['.jpg']
 
 output_csv_filename = 'image_metadata.csv'
-output_csv_path = os.path.join(folderPath, output_csv_filename)
+output_csv_path = os.path.join(dir_name, output_csv_filename)
 
-save_metadata_to_csv(folderPath, output_csv_path, file_ext)
+save_metadata_to_csv(dir_name, output_csv_path, input_ext)

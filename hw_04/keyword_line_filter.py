@@ -1,4 +1,4 @@
-import os
+import os, re
 from typing import Iterator, List
 
 
@@ -29,11 +29,11 @@ class KeywordLineFilter:
         """
         with open(self.file_name, 'r', encoding=self.encoding, errors='replace') as file:
             for line in file:
-                if self.keyword in line:
+                if re.search(self.keyword, line, re.IGNORECASE):
                     yield line.strip()
 
 
-def save_filtered_lines(input_file: str, output_file: str, keyword: str) -> None:
+def save_filtered_lines(input_file: str, output_file: str, keyword: str = 'Error') -> None:
     """
     Reads a file, filters lines containing a specific keyword, and writes them to a new file.
 
@@ -67,9 +67,9 @@ def get_directory_from_user() -> List[str]:
 folder_path: List[str] = get_directory_from_user()
 input_file_path: str = folder_path[0]
 output_file_path: str = folder_path[1]
-search_keyword: str = input("Enter the keyword to search for (default: 'ERROR'): ").strip()
+search_keyword: str = input("Enter the keyword to search for (default: 'Error'): ").strip()
 
 if not search_keyword:
-    search_keyword = "ERROR"
+    search_keyword = "Error"
 
 save_filtered_lines(input_file_path, output_file_path, search_keyword)
