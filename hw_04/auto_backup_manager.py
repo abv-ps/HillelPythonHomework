@@ -4,6 +4,7 @@ from typing import List, Optional
 from datetime import datetime
 import getpass
 
+
 def get_file_from_directory() -> str:
     """
     Prompts the user to input a folder path, lists log files, and allows selecting one.
@@ -46,6 +47,7 @@ class FileBackupManager:
     If an error occurs during processing, the backup is restored automatically.
     If processing is successful, the original file is replaced with the new one.
     """
+
     def __init__(self, file_path: str) -> None:
         self.file_path = file_path
         # Create a backup file name with current timestamp

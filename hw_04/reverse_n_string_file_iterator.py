@@ -1,6 +1,7 @@
 from typing import Iterator, Optional
 from collections import deque
 
+
 class ReversedNStringFileIterator:
     """
     Iterator for reading the last N lines of a file in reverse order.
@@ -57,6 +58,7 @@ class ReversedNStringFileIterator:
             # Reads a file line by line
             for line in file:
                 self.buffer.append(line.strip())  # Add a string to the buffer
+
 
 # Example usage
 file_iterator = ReversedNStringFileIterator("some.txt", n=10)

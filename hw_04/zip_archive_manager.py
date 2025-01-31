@@ -3,6 +3,7 @@ import zipfile
 from typing import Optional, List
 from datetime import datetime
 
+
 def get_file_for_zip() -> tuple[str, str]:
     """
     Prompts the user to input a folder path, lists available files, and allows selecting one.
@@ -21,7 +22,7 @@ def get_file_for_zip() -> tuple[str, str]:
         exit()
 
     available_files = [f for f in os.listdir(file_directory) if
-                                  os.path.isfile(os.path.join(file_directory, f))]
+                       os.path.isfile(os.path.join(file_directory, f))]
 
     if not available_files:
         print("Error: No files found in the selected directory.")

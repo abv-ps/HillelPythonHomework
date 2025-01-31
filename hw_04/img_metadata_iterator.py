@@ -109,7 +109,8 @@ def save_metadata_to_csv(folder_path: str, output_csv: str, file_ext: list[str])
 
 if __name__ == "__main__":
     dir_name: str = get_directory_from_user()  # Get the folder path from the user
-    input_ext = input("Enter img extensions separated by commas (like '.jpg,.png') or tap enter for default '.jpg': ").strip()
+    input_ext = input(
+        "Enter img extensions separated by commas (like '.jpg,.png') or tap enter for default '.jpg': ").strip()
 
     if input_ext:
         input_ext = [ext.strip() for ext in input_ext.split(',')]

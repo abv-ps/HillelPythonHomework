@@ -4,6 +4,7 @@ from ipdb import launch_ipdb_on_exception
 from datetime import datetime
 from typing import Union, Optional
 
+
 def datetime_serializer(obj: datetime) -> str:
     """Serialize datetime objects to ISO format."""
     if isinstance(obj, datetime):
@@ -105,6 +106,7 @@ class ConfigManager:
             raise ValueError(f"Person with name {person_name} not found.")
         else:
             raise ValueError("Unsupported file type. Use 'json' or 'ini'.")
+
 
 config_file = "some.json"
 try:
