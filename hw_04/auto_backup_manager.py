@@ -11,15 +11,15 @@ def get_file_from_directory() -> str:
     Returns:
         str: The selected file path.
     """
-    default_path: str = os.getcwd()
-    user_input: str = input(f"Enter the folder path to select a file for processing (default: {default_path}): ").strip()
-    processing_path: str = user_input or default_path
+    default_path = os.getcwd()
+    user_input = input(f"Enter the folder path to select a file for processing (default: {default_path}): ").strip()
+    processing_path = user_input or default_path
 
     if not os.path.isdir(processing_path):
         print("Error: Invalid directory path.")
         exit()
 
-    processing_files: List[str] = [f for f in os.listdir(processing_path)]
+    processing_files = [f for f in os.listdir(processing_path)]
 
     if not processing_files:
         print("Error: No files found in the selected directory.")
@@ -30,7 +30,7 @@ def get_file_from_directory() -> str:
         print(f"{i}: {file}")
 
     try:
-        file_index: int = int(input("Enter the number of the file you want to process: ")) - 1
+        file_index = int(input("Enter the number of the file you want to process: ")) - 1
         if file_index < 0 or file_index >= len(processing_files):
             raise ValueError
     except ValueError:

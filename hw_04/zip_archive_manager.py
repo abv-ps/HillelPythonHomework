@@ -3,24 +3,24 @@ import zipfile
 from typing import Optional, List
 from datetime import datetime
 
-def get_file_for_zip() -> List[str]:
+def get_file_for_zip() -> tuple[str, str]:
     """
     Prompts the user to input a folder path, lists available files, and allows selecting one.
     Also prompts for an output directory for the ZIP archive.
 
     Returns:
-        List[str]: A list containing the selected file path and the output ZIP archive path.
+        tuple[str, str]: A tuple containing the selected file path and the output ZIP archive path.
     """
-    default_path: str = os.getcwd()
-    user_input_dir: str = input(
+    default_path = os.getcwd()
+    user_input_dir = input(
         f"Enter the folder path containing files to archive (default: {default_path}): ").strip()
-    file_directory: str = user_input_dir or default_path
+    file_directory = user_input_dir or default_path
 
     if not os.path.isdir(file_directory):
         print("Error: Invalid directory path.")
         exit()
 
-    available_files: List[str] = [f for f in os.listdir(file_directory) if
+    available_files = [f for f in os.listdir(file_directory) if
                                   os.path.isfile(os.path.join(file_directory, f))]
 
     if not available_files:
@@ -32,17 +32,17 @@ def get_file_for_zip() -> List[str]:
         print(f"{i}: {file}")
 
     try:
-        file_index: int = int(input("Enter the number of the file you want to archive: ")) - 1
+        file_index = int(input("Enter the number of the file you want to archive: ")) - 1
         if file_index < 0 or file_index >= len(available_files):
             raise ValueError
     except ValueError:
         print("Error: Invalid selection.")
         exit()
 
-    input_file_path: str = os.path.join(file_directory, available_files[file_index])
+    input_file_path = os.path.join(file_directory, available_files[file_index])
 
-    user_input_out: str = input(f"Enter the folder path to save the ZIP archive (default: {default_path}): ").strip()
-    output_directory: str = user_input_out or default_path
+    user_input_out = input(f"Enter the folder path to save the ZIP archive (default: {default_path}): ").strip()
+    output_directory = user_input_out or default_path
 
     if not os.path.isdir(output_directory):
         print("Error: Invalid output directory.")
@@ -52,9 +52,9 @@ def get_file_for_zip() -> List[str]:
     timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M")
     file_name = os.path.splitext(available_files[file_index])[0]  # Get the original file name without extension
     zip_file_name = f"{file_name}_{timestamp}.zip"  # Add timestamp to the file name
-    zip_file_path: str = os.path.join(output_directory, zip_file_name)
+    zip_file_path = os.path.join(output_directory, zip_file_name)
 
-    return [input_file_path, zip_file_path]
+    return input_file_path, zip_file_path
 
 
 class ZipArchiveManager:
