@@ -1,6 +1,8 @@
+"""Simple mathematical calculator."""
+
 class UnknownOperationError(Exception):
     """Exception raised for unknown arithmetic operations."""
-    pass
+
 
 
 def simple_calc() -> None:
