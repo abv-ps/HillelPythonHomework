@@ -13,5 +13,5 @@ ET.SubElement(book_1, 'description').text = 'Some description 2'
 tree = ET.ElementTree(root)
 tree.write('books.xml')
 
-tree = ET.parse('books.xml')
+tree = ET.parse('../books.xml')
 root = tree.getroot()
