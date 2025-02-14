@@ -10,7 +10,7 @@ class Delimiter(csv.Dialect):
 
 csv.register_dialect('delimiter', Delimiter)
 
-with open('data.csv', encoding= 'utf-8') as csvfile:
+with open('../data.csv', encoding='utf-8') as csvfile:
     data = csvfile.read()
     print(re.sub(r'(?<=\d),(?=\d)', ';', data))
 

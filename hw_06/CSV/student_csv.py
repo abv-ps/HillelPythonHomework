@@ -1,4 +1,4 @@
-import os, csv
+import csv
 from typing import List, Dict, Union
 from get_file_from_directory import get_file_from_directory
 
