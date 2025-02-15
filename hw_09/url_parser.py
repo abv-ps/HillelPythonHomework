@@ -40,5 +40,5 @@ def extract_urls(text: str) -> List[str]:
 
 
 text = "Visit our website at https://www.example.com and our support page at http://support.example.com."
-urls = extract_urls(text)
-print(urls)
+ex_urls = extract_urls(text)
+print(ex_urls)

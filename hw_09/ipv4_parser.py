@@ -34,7 +34,7 @@ def extract_ipv4_addresses(text: str) -> List[str]:
     """
     pattern = r'(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})'
 
-    pv4_addresses = re.findall(pattern, text)
+    ipv4_addresses = re.findall(pattern, text)
 
     valid_ipv4_addresses = [
         f"{a}.{b}.{c}.{d}" for a, b, c, d in ipv4_addresses
