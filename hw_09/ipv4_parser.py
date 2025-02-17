@@ -47,6 +47,6 @@ def extract_ipv4_addr(text: str) -> List[str]:
 
 if __name__ == "__main__":
     s = ("The most popular IP addresses in Ukraine: 91.192.0.1, 89.184.13.25, 354.13.52.4, "
-            "2001:0db8:85a3:0000:0000:8a2e:0370:7334, 213.87.98.255.")
+         "2001:0db8:85a3:0000:0000:8a2e:0370:7334, 213.87.98.255.")
     ipv4_addresses = extract_ipv4_addr(s)
     print(ipv4_addresses)

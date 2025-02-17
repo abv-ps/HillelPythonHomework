@@ -1,6 +1,7 @@
 import re
 from typing import List
 
+
 def validate_numbers(n: int, numbers: List[str]) -> List[bool]:
     """
     Checks if each element in the given list is a properly formatted number.
@@ -14,6 +15,7 @@ def validate_numbers(n: int, numbers: List[str]) -> List[bool]:
         print(f"{num}: {'Valid' if res else 'Invalid'}")
 
     return results
+
 
 def is_valid_roman_numeral(roman: str) -> bool:
     """
@@ -30,6 +32,7 @@ def is_valid_roman_numeral(roman: str) -> bool:
         print(f"{roman} is invalid Roman numeral")
 
     return result
+
 
 def extract_hex_colors(n: int, inputs: List[str]) -> List[str]:
     """
@@ -54,6 +57,7 @@ def extract_hex_colors(n: int, inputs: List[str]) -> List[str]:
 
     return results
 
+
 def get_int_input(prompt: str) -> int:
     """Helper function to safely get an integer input."""
     while True:
@@ -62,21 +66,24 @@ def get_int_input(prompt: str) -> int:
         except ValueError:
             print("Invalid input. Please enter a valid integer.")
 
+
 def get_string_input(prompt: str) -> str:
     """Helper function to get a valid string input."""
     return input(prompt).strip()
 
+
 def main():
     n = get_int_input("Enter a valid number of test cases: ")  # Ensure valid integer
-    numbers = [get_string_input(f'Enter the {i+1} number: ') for i in range(n)]
+    numbers = [get_string_input(f'Enter the {i + 1} number: ') for i in range(n)]
     validate_numbers(n, numbers)
 
     roman = get_string_input("\nEnter a Roman numeral to validate: ")
     is_valid_roman_numeral(roman)
 
     n = get_int_input("\nEnter the number of test cases for hex color extraction: ")  # Ensure valid integer
-    inputs = [get_string_input(f'Enter the {i+1} string: ') for i in range(n)]
+    inputs = [get_string_input(f'Enter the {i + 1} string: ') for i in range(n)]
     extract_hex_colors(n, inputs)
+
 
 if __name__ == '__main__':
     main()

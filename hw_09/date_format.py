@@ -55,6 +55,7 @@ def convert_date_format(date: str) -> Optional[str]:
     except ValueError:
         return None  # Incorrect date (for example, 31/04/2025)
 
+
 if __name__ == "__main__":
     ex_date = "17/02/2025"
     formatted_date = convert_date_format(ex_date)

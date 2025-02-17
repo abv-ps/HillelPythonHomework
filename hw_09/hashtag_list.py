@@ -28,6 +28,7 @@ def extract_hashtags(text: str) -> List[str]:
     hashtags = re.findall(r'(?<=#)(?!_)([A-Za-zА-Яа-яІіЇїЄєҐґЁёЄєҐґ0-9]+)(?=\s|$|#)', text)
     return hashtags
 
+
 if __name__ == "__main__":
     s = "The most popular hashtags in Ukraine are: #Україна #Єдність #УкраїнськаМова #_ЗСУ"
     tags = extract_hashtags(s)

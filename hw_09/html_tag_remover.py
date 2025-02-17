@@ -27,10 +27,10 @@ def remove_html_tags(text: str) -> str:
 
 
 s = ('<p>Welcome to <b>my <i>website</i></b>! <i>This is a '
-        '<a href="https://example.com">sample link</a>.</i></p> '
-        '<p>Here is an <b><i>important</i> image link</b>: '
-        '<a href="https://example.com/image.jpg">'
-        '<img src="image.jpg" alt="An image" /></a></p>')
+     '<a href="https://example.com">sample link</a>.</i></p> '
+     '<p>Here is an <b><i>important</i> image link</b>: '
+     '<a href="https://example.com/image.jpg">'
+     '<img src="image.jpg" alt="An image" /></a></p>')
 
 clean_text = remove_html_tags(s)
 print(f"Cleaned text: {clean_text}" if clean_text else "Empty input or invalid text.")
