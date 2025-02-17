@@ -36,7 +36,7 @@ def main() -> None:
 
 
 num_lines: Optional[str] = input_with_timeout("Please enter the number "
-                                              "of lines to test: ", 20)
+                                              "of lines to test email: ", 20)
 
 if num_lines is None or not num_lines.isdigit():
     print("Invalid input. Exiting...")
@@ -51,7 +51,7 @@ for _ in range(int(num_lines)):
     match: Optional[re.Match[str]] = re.fullmatch(r"^\w+[\w.]*@\w+\.\w{2,6}$"
                                                   , input_str)
     if match:
-        print(input_str)
+        print(f'{input_str} is a valid email.')
     else:
         print("Invalid email format.")
 

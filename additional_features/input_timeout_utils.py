@@ -55,7 +55,6 @@ def input_with_timeout(prompt: str, timeout: int = 5) -> Optional[str]:
         return None  # Timeout occurred
 
 
-# Example usage
 if __name__ == "__main__":
     user_input = input_with_timeout("Enter something: ", 5)
     if user_input:

@@ -39,7 +39,7 @@ def find_and_format_phone_numbers(text: str) -> List[str]:
     # Find all phone numbers in the text
     phone_numbers = re.findall(pattern, text)
 
-    formatted_numbers = []
+    f_numbers = []
 
     for number in phone_numbers:
         # Remove all non-digit characters
@@ -47,13 +47,13 @@ def find_and_format_phone_numbers(text: str) -> List[str]:
 
         # Ensure it has exactly 10 digits (to match (XXX) XXX-XXXX)
         if len(digits) == 10:
-            formatted_number = "({}) {}-{}".format(digits[:3], digits[3:6], digits[6:])
-            formatted_numbers.append(formatted_number)
+            f_number = f"({digits[:3]}) {digits[3:6]}-{digits[6:]}"
+            f_numbers.append(f_number)
 
-    return formatted_numbers
+    return f_numbers
 
 
-# Example usage
-text = "Call me at (063) 567-2574, 067-453-3529, or 099.721.4782."
-formatted_numbers = find_and_format_phone_numbers(text)
-print(formatted_numbers)
+if __name__ == "__main__":
+    s = "Call me at (063) 567-2574, 067-453-3529, or 099.721.4782."
+    formatted_numbers = find_and_format_phone_numbers(s)
+    print(formatted_numbers)

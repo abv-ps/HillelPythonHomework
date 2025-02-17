@@ -43,7 +43,6 @@ def secure_password(password: str) -> bool:
     return bool(re.match(pattern, password))
 
 
-# Example usage
 passwords = ["WeakPass", "Strong@123", "NoSpecial123", "short1@A", "Valid$Pass1!", "P@$$w0rd!"]
 for pwd in passwords:
     print(f"{pwd}: {secure_password(pwd)}")

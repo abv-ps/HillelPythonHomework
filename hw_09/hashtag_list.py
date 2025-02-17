@@ -20,15 +20,15 @@ def extract_hashtags(text: str) -> List[str]:
         List[str]: A list of hashtags without the '#' symbol.
 
     Example:
-        >>> extract_hashtags("The most popular hashtags in Ukraine are: #Україна #Єдність #УкраїнськаМова #_ЗСУ")
+        >>> extract_hashtags("The most popular hashtags in Ukraine are: "
+        ...                  "#Україна #Єдність #УкраїнськаМова #_ЗСУ")
         ['Україна', 'Єдність', 'УкраїнськаМова']
     """
     # Regular expression to find words that start with # and contain only letters and numbers
     hashtags = re.findall(r'(?<=#)(?!_)([A-Za-zА-Яа-яІіЇїЄєҐґЁёЄєҐґ0-9]+)(?=\s|$|#)', text)
     return hashtags
 
-
-# Example usage:
-text = "The most popular hashtags in Ukraine are: #Україна #Єдність #УкраїнськаМова #_ЗСУ"
-hashtags = extract_hashtags(text)
-print(hashtags)
+if __name__ == "__main__":
+    s = "The most popular hashtags in Ukraine are: #Україна #Єдність #УкраїнськаМова #_ЗСУ"
+    tags = extract_hashtags(s)
+    print(tags)

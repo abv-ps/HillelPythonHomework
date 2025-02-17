@@ -1,3 +1,26 @@
+"""
+This module processes a web server log file, extracting information about client requests.
+
+It contains functions to:
+1. Parse individual log lines to extract the IP address, HTTP method, and status code.
+2. Analyze an entire log file and count occurrences of each unique combination
+of IP address, HTTP method, and status code.
+3. Print the statistics showing how many times each unique log entry appeared.
+
+Functions:
+- parse_log_line(line: str) -> Tuple[str, str, str] | None:
+    Parses a single log line to extract the IP address, HTTP method, and status code.
+- analyze_log(file_path: str) -> Dict[Tuple[str, str, str], int]:
+    Analyzes the log file and counts occurrences of unique
+    (IP, HTTP method, status code) combinations.
+- print_statistics(stats: Dict[Tuple[str, str, str], int]) -> None:
+    Prints the statistics of the log entries.
+
+Usage:
+    The user can provide a path to a web server log file, and the script will analyze it,
+    printing the count of each unique log entry combination.
+"""
+
 import re
 from collections import Counter
 from typing import Tuple, List, Dict
@@ -15,10 +38,12 @@ def parse_log_line(line: str) -> Tuple[str, str, str] | None:
         line (str): A line from the log file.
 
     Returns:
-        Tuple[str, str, str] | None: A tuple containing (IP, HTTP method, status code), or None if no match found.
+        Tuple[str, str, str] | None: A tuple containing (IP, HTTP method, status code),
+        or None if no match found.
 
     Examples:
-        >>> parse_log_line('192.168.1.1 - - [10/Feb/2025:13:55:36 +0000] "GET /index.html HTTP/1.1" 200 1024')
+        >>> parse_log_line('192.168.1.1 - - [10/Feb/2025:13:55:36 +0000] '
+    ...                     '"GET /index.html HTTP/1.1" 200 1024')
         ('192.168.1.1', 'GET', '200')
     """
     match = LOG_PATTERN.search(line)
@@ -33,7 +58,8 @@ def analyze_log(file_path: str) -> Dict[Tuple[str, str, str], int]:
         file_path (str): Path to the log file.
 
     Returns:
-        Dict[Tuple[str, str, str], int]: A dictionary mapping tuples (IP, HTTP method, status code) to their counts.
+        Dict[Tuple[str, str, str], int]: A dictionary mapping tuples
+        (IP, HTTP method, status code) to their counts.
     """
     entries: List[Tuple[str, str, str]] = []
 
@@ -58,6 +84,6 @@ def print_statistics(stats: Dict[Tuple[str, str, str], int]) -> None:
 
 
 if __name__ == "__main__":
-    log_file_path = "access_log_20240925_2.log"  # Change this to the actual log file path
-    statistics = analyze_log(log_file_path)
+    LOG_FILE_PATH = "access_log_20240925_2.log"
+    statistics = analyze_log(LOG_FILE_PATH)
     print_statistics(statistics)

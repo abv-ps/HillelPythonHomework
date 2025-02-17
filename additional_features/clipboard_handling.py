@@ -62,6 +62,5 @@ def process_clipboard_and_divide(factor: float = 1.2) -> None:
         root.withdraw()
         messagebox.showerror("Error", "The clipboard does not contain a valid number!")
 
-
-# Call the function to run it
-process_clipboard_and_divide()
+if __name__ == "__main__":
+    process_clipboard_and_divide()
