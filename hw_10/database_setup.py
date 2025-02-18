@@ -1,7 +1,6 @@
 import csv
 import sqlite3
 from typing import Optional, List, Tuple
-Pragma foreign key = on
 
 
 def connect_db(db_name: str) -> sqlite3.Connection:
@@ -15,6 +14,7 @@ def create_tables(cursor: sqlite3.Cursor) -> None:
     """
     Creates tables for movies, actors, and their relationships.
     """
+    cursor.execute("PRAGMA foreign_keys = ON;")
     cursor.executescript('''
     CREATE TABLE IF NOT EXISTS movies (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
