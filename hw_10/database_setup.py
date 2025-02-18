@@ -89,28 +89,28 @@ def load_csv(filename: str) -> List[List[str]]:
 
 if __name__ == '__main__':
     conn = connect_db('kinodb.db')
-    cursor = conn.cursor()
+    local_cursor = conn.cursor()
 
-    create_tables(cursor)
+    create_tables(local_cursor)
 
     movies_data = load_csv('movies.csv')
     actors_data = load_csv('actors.csv')
 
-    movies = [(row[0], int(row[1]), row[2]) for row in movies_data]
-    actors = [(row[0], int(row[1])) for row in actors_data]
+    movies_list = [(row[0], int(row[1]), row[2]) for row in movies_data]
+    actors_list = [(row[0], int(row[1])) for row in actors_data]
 
-    insert_movies(cursor, movies)
-    insert_actors(cursor, actors)
+    insert_movies(local_cursor, movies_list)
+    insert_actors(local_cursor, actors_list)
     conn.commit()
 
     movie_cast_data = []
     for movie_title, actor_name in actors_data:
-        movie_id = get_movie_id(cursor, movie_title)
-        actor_id = get_actor_id(cursor, actor_name)
+        movie_id = get_movie_id(local_cursor, movie_title)
+        actor_id = get_actor_id(local_cursor, actor_name)
         if movie_id and actor_id:
             movie_cast_data.append((movie_id, actor_id))
 
-    insert_movie_cast(cursor, movie_cast_data)
+    insert_movie_cast(local_cursor, movie_cast_data)
     conn.commit()
     conn.close()
     print("Database setup completed successfully!")
