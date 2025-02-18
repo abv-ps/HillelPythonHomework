@@ -1,6 +1,7 @@
 import csv
 import sqlite3
 from typing import Optional, List, Tuple
+Pragma foreign key = on
 
 
 def connect_db(db_name: str) -> sqlite3.Connection:
