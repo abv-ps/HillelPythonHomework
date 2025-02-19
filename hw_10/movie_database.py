@@ -1,10 +1,12 @@
 import sqlite3
 import datetime
 from typing import Optional
-
-
-def connect_db(db_name: str) -> sqlite3.Connection:
-    return sqlite3.connect(db_name)
+from database_setup import (
+    connect_db,
+    insert_movies,
+    insert_actors,
+    insert_movie_cast
+)
 
 
 def choose_page_action(current_page: int, total_pages: int, movies: list) -> int:
@@ -27,14 +29,39 @@ def choose_page_action(current_page: int, total_pages: int, movies: list) -> int
         if movie_choice.isdigit() and 1 <= int(movie_choice) <= len(movies):
             return -1  # Indicating the user selected a movie
         elif movie_choice in ['next', '+1'] and current_page < total_pages:
-            return current_page + 1  # Go to the next page
+            if current_page < total_pages:
+                return current_page + 1
+            else:
+                print("You are already on the last page.")
         elif movie_choice in ['prev', '-1'] and current_page > 1:
-            return current_page - 1  # Go to the previous page
+            if current_page > 1:
+                return current_page - 1
+            else:
+                print("You are already on the first page.")
         else:
-            print("Invalid selection or you are already at the first/last page. Please try again.")
+            print("Invalid selection. Please try again.")
 
 
-def search_movie_by_keyword(cursor: sqlite3.Cursor) -> Optional[str]:
+import sqlite3
+from typing import Optional, List, Tuple
+
+
+def find_movies_by_keyword(cursor: sqlite3.Cursor, keyword: str) -> List[Tuple[str]]:
+    """
+    Searches for movies by keyword without user interaction.
+
+    Args:
+        cursor (sqlite3.Cursor): The cursor object for executing SQL queries.
+        keyword (str): The keyword to search for in movie titles.
+
+    Returns:
+        List[Tuple[str]]: A list of movie titles matching the keyword.
+    """
+    cursor.execute("SELECT title FROM movies WHERE title LIKE ? ORDER BY title", (f"%{keyword}%",))
+    return cursor.fetchall()
+
+
+def search_movie_interactive(cursor: sqlite3.Cursor) -> Optional[str]:
     """
     Prompts the user to search for a movie by a part of its title, using pagination.
 
@@ -48,33 +75,27 @@ def search_movie_by_keyword(cursor: sqlite3.Cursor) -> Optional[str]:
     results_per_page = 15
     while attempts < 3:
         movie_name = input("Enter a part of the movie title to search for: ")
-        cursor.execute("SELECT COUNT(*) FROM movies WHERE title LIKE ?", (f"%{movie_name}%",))
-        count_of_founded_movies: int = int(cursor.fetchone()[0])
+        movies = find_movies_by_keyword(cursor, movie_name)
 
-        if count_of_founded_movies == 0:
+        if not movies:
             print("No movies found with that title.")
             attempts += 1
         else:
-            total_pages: int = (count_of_founded_movies // results_per_page) + (
-                1 if count_of_founded_movies % results_per_page > 0 else 0)
-            current_page: int = 1
+            total_pages = (len(movies) // results_per_page) + (1 if len(movies) % results_per_page > 0 else 0)
+            current_page = 1
             while current_page <= total_pages:
                 offset = (current_page - 1) * results_per_page
-                cursor.execute("SELECT title FROM movies WHERE title LIKE ? ORDER BY title LIMIT ? OFFSET ?",
-                               (f"%{movie_name}%", results_per_page, offset))
-                movies: list = cursor.fetchall()
+                page_movies = movies[offset : offset + results_per_page]
+
                 print(f"\nPage {current_page} of {total_pages}:")
-                for i, (m_title,) in enumerate(movies, 1):
+                for i, (m_title,) in enumerate(page_movies, 1):
                     print(f"{(current_page - 1) * results_per_page + i}. {m_title}")
 
-                # Using the choose_page_action function for navigation
-                new_page = choose_page_action(current_page, total_pages, movies)
+                new_page = choose_page_action(current_page, total_pages, page_movies)
 
                 if new_page == -1:
-                    # If -1 is returned, it means the user selected a movie
-                    movie_choice = int(input(f"Select a movie (1-{len(movies)}): ").strip())
-                    movie_title = movies[movie_choice - 1][0]
-                    return movie_title
+                    movie_choice = int(input(f"Select a movie (1-{len(page_movies)}): ").strip())
+                    return page_movies[movie_choice - 1][0]  # Return selected movie title
                 else:
                     current_page = new_page
     print("Too many invalid attempts. Exiting...")
@@ -82,12 +103,20 @@ def search_movie_by_keyword(cursor: sqlite3.Cursor) -> Optional[str]:
 
 
 def insert_movie(cursor: sqlite3.Cursor) -> None:
-    title = search_movie_by_keyword(cursor)
-    if title:
-        print(f"Using existing movie '{title}'.")
+    """
+    Inserts a new movie into the database, ensuring no duplicates.
+
+    Args:
+        cursor (sqlite3.Cursor): The cursor object for executing SQL queries.
+    """
+    movie_name = input("Enter the movie title to add: ")
+    existing_movies = find_movies_by_keyword(cursor, movie_name)
+
+    if existing_movies:
+        print(f"Movie '{existing_movies[0][0]}' already exists. Not adding a duplicate.")
         return
 
-    title = input("Enter the movie title: ")
+    title = movie_name
     for _ in range(3):
         try:
             release_year = int(input("Enter the movie release year: "))
@@ -101,15 +130,15 @@ def insert_movie(cursor: sqlite3.Cursor) -> None:
         return
 
     genre = input("Enter the movie genre: ")
-    cursor.execute('''INSERT INTO movies (title, release_year, genre) VALUES (?, ?, ?)''',
-                   (title, release_year, genre))
+    insert_movies(cursor, (title, release_year, genre))
     cursor.connection.commit()
     print(f"Movie '{title}' added.")
 
 
+
 def insert_actor(cursor: sqlite3.Cursor) -> None:
     actor_name = input("Enter the actor's name: ")
-    movie_title = search_movie_by_keyword(cursor)
+    movie_title = search_movie_interactive(cursor)
     if not movie_title:
         print("No valid movie found. Exiting...")
         return
@@ -286,6 +315,10 @@ def movie_age(release_year: int) -> int:
     current_year = datetime.datetime.now().year
     return current_year - release_year
 
+def register_functions(conn):
+    """Реєструє кастомну функцію в SQLite."""
+    conn.create_function("movie_age", 1, movie_age)
+
 def show_movies_with_age(cursor: sqlite3.Cursor) -> None:
     """
     Displays all movies with their respective ages (years since release).
@@ -293,7 +326,7 @@ def show_movies_with_age(cursor: sqlite3.Cursor) -> None:
     Args:
         cursor (sqlite3.Cursor): The cursor object for executing SQL queries.
     """
-    cursor.execute("SELECT title, release_year FROM movies")
+    cursor.execute("SELECT title, release_year, movie_age(release_year) FROM movies")
     movies = cursor.fetchall()
 
     if not movies:
@@ -415,40 +448,40 @@ def fetch_actors_and_movies(cursor: sqlite3.Cursor, results_per_page: int = 10) 
 
 
 def main():
-    conn = connect_db("movies.db")
-    cursor = conn.cursor()
-    while True:
-        print("\n1. Add Movie\n2. Add Actor\n3. Search Movie by keyword"
-              "\n4. Show all movies with actors\n5. Show all genres"
-              "\n6. Show movie count by genre\n7. Show movies with age"
-              "\n8. Search genre by part name\n9. Show average birth year of actors in genre"
-              "\10. Show names of all actors and titles of all movies\n0. Exit")
-        choice = input("Choose an option: ")
-        if choice == "1":
-            insert_movie(cursor)
-        elif choice == "2":
-            insert_actor(cursor)
-        elif choice == "3":
-            search_movie_by_keyword(cursor)
-        elif choice == "4":
-            show_movies_with_actors(cursor)
-        elif choice == "5":
-            show_genres(cursor)
-        elif choice == "6":
-            show_movie_count_by_genre(cursor)
-        elif choice == "7":
-            show_movies_with_age(cursor)
-        elif choice == "8":
-            search_genre_by_part_name(cursor)
-        elif choice == "9":
-            average_birth_year_of_actors_in_genre(cursor, search_genre_by_part_name(cursor))
-        elif choice == "10":
-            fetch_actors_and_movies(cursor)
-        elif choice == "0":
-            break
-        else:
-            print("Invalid choice. Try again.")
-    conn.close()
+    with connect_db("movies.db") as conn:
+        cursor = conn.cursor()
+        register_functions(conn)
+        while True:
+            print("\n1. Add Movie\n2. Add Actor\n3. Search Movie by keyword"
+                  "\n4. Show all movies with actors\n5. Show all genres"
+                  "\n6. Show movie count by genre\n7. Show movies with age"
+                  "\n8. Search genre by part name\n9. Show average birth year of actors in genre"
+                  "\10. Show names of all actors and titles of all movies\n0. Exit")
+            choice = input("Choose an option: ")
+            if choice == "1":
+                insert_movie(cursor)
+            elif choice == "2":
+                insert_actor(cursor)
+            elif choice == "3":
+                search_movie_by_keyword(cursor)
+            elif choice == "4":
+                show_movies_with_actors(cursor)
+            elif choice == "5":
+                show_genres(cursor)
+            elif choice == "6":
+                show_movie_count_by_genre(cursor)
+            elif choice == "7":
+                show_movies_with_age(cursor)
+            elif choice == "8":
+                search_genre_by_part_name(cursor)
+            elif choice == "9":
+                average_birth_year_of_actors_in_genre(cursor, search_genre_by_part_name(cursor))
+            elif choice == "10":
+                fetch_actors_and_movies(cursor)
+            elif choice == "0":
+                break
+            else:
+                print("Invalid choice. Try again.")
 
 
 if __name__ == "__main__":

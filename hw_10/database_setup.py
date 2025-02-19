@@ -1,13 +1,32 @@
 import csv
 import sqlite3
 from typing import Optional, List, Tuple
+from models import Movie, Actor, MovieCast
 
 
-def connect_db(db_name: str) -> sqlite3.Connection:
-    """
-    Establish a connection to the SQLite database.
-    """
-    return sqlite3.connect(db_name)
+def connect_db(db_name: str):
+    """Функція для підключення до бази даних з обробкою помилок."""
+    try:
+        # Спробуємо підключитися до бази даних
+        conn = sqlite3.connect(db_name)
+        print("Database connected successfully.")
+        return conn
+    except sqlite3.OperationalError as e:
+        # Помилка з'єднання, може бути через відсутність бази даних
+        print(f"Operational error: {e}. Unable to connect to the database.")
+        return None
+    except sqlite3.DatabaseError as e:
+        # Проблеми з базою даних або доступом до файлу бази даних
+        print(f"Database error: {e}. There might be an issue with the database file or permissions.")
+        return None
+    except sqlite3.Error as e:
+        # Загальна помилка, якщо не попали під конкретні випадки
+        print(f"An unexpected SQLite error occurred: {e}")
+        return None
+    except Exception as e:
+        # Загальна помилка, якщо виникла інша помилка
+        print(f"An unexpected error occurred: {e}")
+        return None
 
 
 def create_tables(cursor: sqlite3.Cursor) -> None:
@@ -38,18 +57,26 @@ def create_tables(cursor: sqlite3.Cursor) -> None:
     ''')
 
 
-def insert_movies(cursor: sqlite3.Cursor, movies: List[Tuple[str, int, str]]) -> None:
+def insert_movies(cursor: sqlite3.Cursor, movies: List[Movie]) -> None:
     """
     Inserts movies into the database.
+
+    Args:
+        cursor (sqlite3.Cursor): Об'єкт курсора для виконання SQL запитів.
+        movies (List[Movie]): Список об'єктів Movie.
     """
-    cursor.executemany('''INSERT INTO movies (title, release_year, genre) VALUES (?, ?, ?)''', movies)
+    movies_list = [(movie.title, movie.release_year, movie.genre) for movie in movies]
+
+    cursor.executemany('''INSERT INTO movies (title, release_year, genre) VALUES (?, ?, ?)''', movies_list)
 
 
-def insert_actors(cursor: sqlite3.Cursor, actors: List[Tuple[str, int]]) -> None:
+def insert_actors(cursor: sqlite3.Cursor, actors: List[Actor]) -> None:
     """
     Inserts actors into the database.
     """
-    cursor.executemany('''INSERT INTO actors (name, birth_year) VALUES (?, ?)''', actors)
+    actors_list = [(actor.name, actor.birth_year) for actor in actors]
+
+    cursor.executemany('''INSERT INTO actors (name, birth_year) VALUES (?, ?)''', actors_list)
 
 
 def get_movie_id(cursor: sqlite3.Cursor, title: str) -> Optional[int]:
