@@ -33,6 +33,7 @@ def create_tables(cursor: sqlite3.Cursor) -> None:
     """
     Creates tables for movies, actors, and their relationships.
     """
+    cursor.execute("PRAGMA foreign_keys = ON;")
     cursor.executescript('''
     CREATE TABLE IF NOT EXISTS movies (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
