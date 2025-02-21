@@ -173,7 +173,13 @@ if __name__ == '__main__':
         sys.exit(1)
     local_cursor = conn.cursor()
 
+    print("Starting to create tables.")
     create_tables(local_cursor)
+    local_cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    tables = local_cursor.fetchall()
+
+    for table in tables:
+        print(table[0])
 
     movies_data = load_csv('movies.csv')
     actors_data = load_csv('actors.csv')

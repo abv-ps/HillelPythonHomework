@@ -37,6 +37,7 @@ analytical results in a user-friendly manner with pagination support.
 
 import sqlite3
 import datetime
+import re
 from typing import Optional, List, Tuple
 from database_setup import (
     connect_db,
@@ -109,8 +110,9 @@ def find_movies_by_keyword(cursor: sqlite3.Cursor, keyword: str) -> List[Tuple[s
     Returns:
         List[Tuple[str]]: A list of movie titles matching the keyword.
     """
-    cursor.execute("SELECT title FROM movies WHERE LOWER(title) LIKE LOWER(?) ORDER BY title",
-                   (f"%{keyword}%",))
+    like_pattern = '%'.join(list(re.sub(r'[^a-zA-Zа-яА-Я]', '', keyword)))
+    cursor.execute("SELECT title FROM movies WHERE title COLLATE NOCASE LIKE ? ORDER BY title",
+                   (f"%{like_pattern}%",))
     return cursor.fetchall()
 
 
@@ -276,16 +278,16 @@ def show_movies_with_actors(cursor: sqlite3.Cursor) -> None:
             break
 
         formatted_movies = [
-            f"{(current_page - 1) * page_size + i}. Movie: \"{movie_title}\", Actors: {actors}"
-            for i, (movie_title, actors) in enumerate(movies_actors, 1)
+            f"Movie: \"{movie_title}\", Actors: {actors}"
+            for movie_title, actors in movies_actors
         ]
 
         selected = choose_page_action(current_page, total_pages, formatted_movies, "movie", page_size)
 
-        if isinstance(selected, str):  # Вибір фільму
-            if selected == "exit":  # Якщо користувач обрав exit
+        if isinstance(selected, str):
+            if selected == "exit":
                 return
-            movie_index = int(selected.split(".")[0]) - 1  # Отримуємо індекс фільму
+            movie_index = int(selected.split(".")[0]) - 1
             movie_title = movies_actors[movie_index][0]
             print(f"You selected the movie: {movie_title}")
             break
@@ -305,7 +307,8 @@ def get_unique_genres(cursor: sqlite3.Cursor) -> list:
         list: A list of unique movie genres.
     """
     cursor.execute("SELECT DISTINCT genre FROM movies ORDER BY genre")
-    return [genre[0] for genre in cursor.fetchall()]
+    genres = cursor.fetchall()
+    return [genre[0] for genre in genres]
 
 
 def show_genres(cursor: sqlite3.Cursor) -> int | str | None:
@@ -359,12 +362,16 @@ def show_movie_count_by_genre(cursor: sqlite3.Cursor) -> None:
         return
 
     print("\nMovie count by genre:")
-    for genre, in genres:
+    for genre in genres:
         # Get the count of movies for each genre
         cursor.execute("SELECT COUNT(*) FROM movies WHERE genre = ?", (genre,))
         movie_count = cursor.fetchone()[0]
 
         print(f"Genre: {genre} - {movie_count} movies")
+    while True:
+        input("\nType something to join the main menu.")
+        return None
+
 
 
 def movie_age(release_year: int) -> int:
@@ -533,7 +540,7 @@ def main():
     The user can choose an action by inputting a corresponding number.
     The program will continue until the user chooses the "Exit" option (option 0).
     """
-    with connect_db("movies.db") as conn:
+    with connect_db("kinodb.db") as conn:
         cursor = conn.cursor()
         register_functions(conn)
         options = {
