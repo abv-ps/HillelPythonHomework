@@ -35,9 +35,9 @@ analytical results in a user-friendly manner with pagination support.
 
 """
 
+import sys
 import sqlite3
 import datetime
-import re
 from typing import Optional, List, Tuple
 from database_setup import (
     connect_db,
@@ -46,60 +46,16 @@ from database_setup import (
     insert_movie_cast
 )
 from models import Movie, Actor, MovieCast
+from services import (
+    Validator,
+    choose_page_action,
+    go_to_main_menu,
+    get_valid_movie_title
+)
 from hw_10.database_setup import get_actor_id, get_movie_id
 
 
-def choose_page_action(current_page: int, total_pages: int, items: list, item_name: str,
-                       results_per_page: int = 15) -> str | int:
-    """
-    Prompts the user to choose an item or navigate between pages (next, prev).
-
-    Args:
-        current_page (int): The current page number.
-        total_pages (int): The total number of pages.
-        items (list): The list of items to select from (e.g., movies, actors).
-        item_name (str): The name of the item (e.g., "movie", "actor").
-        results_per_page (int): The number of items to display per page (default is 15).
-
-    Returns:
-        str|int: The name of the selected item or the new current page number if user navigates between pages.
-    """
-    while True:
-        start_index = (current_page - 1) * results_per_page
-        end_index = start_index + results_per_page
-        page_items = items[start_index:end_index]
-
-        print(f"Page {current_page} of {total_pages}\n")
-        print(f"Showing {item_name}s {start_index + 1}-{start_index + len(page_items)} of {len(items)}")
-
-        for i, item in enumerate(page_items, 1):
-            print(f"{start_index + i}. {item}")
-
-        print("\nTo return to the main menu, type 'exit' or 'q'.")
-
-        choice = input(
-            f"Select a {item_name} (1-{len(page_items)}) or type 'next'|'+1' to go to the next page, "
-            f"type 'prev'|'-1' to go to the previous page: ").strip().lower()
-
-        if choice in {"exit", "q"}:
-            return "exit"
-
-        if choice.isdigit():
-            choice_index = int(choice) - 1
-            if 0 <= choice_index < len(page_items):
-                return page_items[choice_index][0]
-            print("Invalid selection. Please try again.")
-        elif choice in ['next', '+1']:
-            if current_page < total_pages:
-                return current_page + 1
-            print("You are already on the last page.")
-        elif choice in ['prev', '-1']:
-            if current_page > 1:
-                return current_page - 1
-            print("You are already on the first page.")
-
-
-def find_movies_by_keyword(cursor: sqlite3.Cursor, keyword: str) -> List[Tuple[str]]:
+def find_movies_by_keyword(cursor: sqlite3.Cursor, keyword: str) -> List[str]:
     """
     Searches for movies by keyword without user interaction.
 
@@ -110,10 +66,12 @@ def find_movies_by_keyword(cursor: sqlite3.Cursor, keyword: str) -> List[Tuple[s
     Returns:
         List[Tuple[str]]: A list of movie titles matching the keyword.
     """
-    like_pattern = '%'.join(list(re.sub(r'[^a-zA-Zа-яА-Я]', '', keyword)))
     cursor.execute("SELECT title FROM movies WHERE title COLLATE NOCASE LIKE ? ORDER BY title",
-                   (f"%{like_pattern}%",))
-    return cursor.fetchall()
+                   (f"%{keyword}%",))
+    result = cursor.fetchall()
+    if not result:
+        return []
+    return [movie[0] for movie in result]
 
 
 def search_movie_interactive(cursor: sqlite3.Cursor) -> Optional[str]:
@@ -126,32 +84,32 @@ def search_movie_interactive(cursor: sqlite3.Cursor) -> Optional[str]:
     Returns:
         Optional[str]: The title of the movie selected by the user, or None if no valid movie is found.
     """
-    attempts = 0
     results_per_page = 15
-    while attempts < 3:
-        movie_name = input("Enter a part of the movie title to search for: ")
-        movies = find_movies_by_keyword(cursor, movie_name)
+    movie_name = get_valid_movie_title()
+    if movie_name is None:
+        return None
 
-        if not movies:
-            print("No movies found with that title.")
-            attempts += 1
-            continue
 
-        total_pages = (len(movies) + results_per_page - 1) // results_per_page
-        current_page = 1
-        item_name = 'movie'
+    movies = find_movies_by_keyword(cursor, movie_name)
 
-        while True:
-            film_or_page = choose_page_action(current_page, total_pages, movies, item_name, results_per_page)
+    if not movies:
+        print("No movies found with that title.")
+        return go_to_main_menu(immediate_exit=True)
 
-            if isinstance(film_or_page, str):
-                if film_or_page == "exit":
-                    return None
-                return film_or_page
-            current_page = film_or_page
+    total_pages = (len(movies) + results_per_page - 1) // results_per_page
+    current_page = 1
+    item_name = 'found movie'
+    selection = 'off'
 
-    print("Too many invalid attempts. Exiting...")
-    return None
+    while True:
+        action = choose_page_action(current_page, total_pages, movies,
+                                          item_name, selection, results_per_page)
+        print(action)
+        if isinstance(action, str):
+            if action == "exit":
+                input("\nPress any key to return to the main menu...")
+                return go_to_main_menu(immediate_exit=True)
+        current_page = action
 
 
 def insert_movie(cursor: sqlite3.Cursor, movie_name: str|None = None, skip_check: bool = False) -> None:
@@ -165,6 +123,9 @@ def insert_movie(cursor: sqlite3.Cursor, movie_name: str|None = None, skip_check
     """
     if not movie_name:
         movie_name = input("Enter the movie title to add: ")
+        v = Validator()
+        v.validate_title_movie(movie_name, "movie title")
+
     if not skip_check:
         existing_movies = find_movies_by_keyword(cursor, movie_name)
         if any(movie[0].lower() == movie_name.lower() for movie in existing_movies):
@@ -184,7 +145,7 @@ def insert_movie(cursor: sqlite3.Cursor, movie_name: str|None = None, skip_check
         return
 
     genre = input("Enter the movie genre: ")
-    if not genre:  # Якщо введено порожній рядок
+    if not genre:
         genre = input("Genre is not entered. Please enter the movie genre:")
 
     insert_movies(cursor, [Movie(movie_name, release_year, genre)])
@@ -200,7 +161,7 @@ def insert_actor(cursor: sqlite3.Cursor) -> None:
         cursor (sqlite3.Cursor): The SQLite database cursor.
     """
     actor_name = input("Enter the actor's name: ")
-
+    validate_actor_name_genre(actor_name, "actor's name")
     existing_actor = get_actor_id(cursor, actor_name)
     if not existing_actor:
         for _ in range(3):
@@ -558,11 +519,12 @@ def main():
         }
 
         while True:
+            print("Hello! Welcome to the movie database menu. How would you like to proceed?")
             print("\n1. Add Movie\n2. Add Actor\n3. Search Movie by keyword"
                   "\n4. Show all movies with actors\n5. Show all genres"
                   "\n6. Show movie count by genre\n7. Show movies with age"
                   "\n8. Search genre by part name\n9. Show average birth year of actors in genre"
-                  "\10. Show names of all actors and titles of all movies\n0. Exit")
+                  "\n10. Show names of all actors and titles of all movies\n0. Exit")
             choice = input("Choose an option: ")
 
             if choice in options:
@@ -579,7 +541,9 @@ def main():
                 print("Invalid choice. Try again.")
 
             if choice == "0":
-                break
+                print("Finishing work with database..."
+                      "Thank you, have a nice to meet!")
+                sys.exit(1)
 
 
 if __name__ == "__main__":
