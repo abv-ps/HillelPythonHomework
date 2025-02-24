@@ -14,7 +14,6 @@ Features:
 - Provide pagination for viewing long lists of items (movies, actors, genres).
 
 Functions:
-- `choose_page_action`: Handles pagination and item selection.
 - `find_movies_by_keyword`: Searches for movies based on a keyword.
 - `search_movie_interactive`: Allows interactive movie search by title.
 - `insert_movie`: Adds a new movie to the database.
@@ -39,47 +38,42 @@ import sys
 import sqlite3
 import datetime
 from typing import Optional, List, Tuple
-from database_setup import (
-    connect_db,
-    insert_movies,
-    insert_actors,
-    insert_movie_cast
-)
-from models import Movie, Actor, MovieCast
+from database_setup import Database as db
+from db_models import Movie, Actor, MovieCast
 from services import (
     Validator,
     choose_page_action,
     go_to_main_menu,
-    get_valid_movie_title
+    get_valid_movie_title,
+    case_insensitive_collation
 )
-from hw_10.database_setup import get_actor_id, get_movie_id
 
 
-def find_movies_by_keyword(cursor: sqlite3.Cursor, keyword: str) -> List[str]:
+def find_movies_by_keyword(db: db, keyword: str) -> List[str]:
     """
     Searches for movies by keyword without user interaction.
 
     Args:
-        cursor (sqlite3.Cursor): The cursor object for executing SQL queries.
+        db: Database : The db: Database object for executing SQL queries.
         keyword (str): The keyword to search for in movie titles.
 
     Returns:
-        List[Tuple[str]]: A list of movie titles matching the keyword.
+        List[str]: A list of movie titles matching the keyword.
     """
-    cursor.execute("SELECT title FROM movies WHERE title COLLATE NOCASE LIKE ? ORDER BY title",
-                   (f"%{keyword}%",))
-    result = cursor.fetchall()
-    if not result:
-        return []
-    return [movie[0] for movie in result]
+    db.register_custom_function("CI", 2, case_insensitive_collation)
+    query = "SELECT title, release_year FROM movies WHERE title COLLATE CI LIKE ? ORDER BY title"
+
+    result: list = db.execute_query(query, (f"%{keyword}%",))
+
+    return [(movie[0], movie[1]) for movie in result] if result else []
 
 
-def search_movie_interactive(cursor: sqlite3.Cursor) -> Optional[str]:
+def search_movie_interactive(db: db) -> Optional[str]:
     """
     Prompts the user to search for a movie by a part of its title, using pagination.
 
     Args:
-        cursor (sqlite3.Cursor): The cursor object for executing SQL queries.
+        db: Database : The db: Database object for executing SQL queries.
 
     Returns:
         Optional[str]: The title of the movie selected by the user, or None if no valid movie is found.
@@ -90,21 +84,23 @@ def search_movie_interactive(cursor: sqlite3.Cursor) -> Optional[str]:
         return None
 
 
-    movies = find_movies_by_keyword(cursor, movie_name)
+    movies = find_movies_by_keyword(db, movie_name)
 
     if not movies:
         print("No movies found with that title.")
         return go_to_main_menu(immediate_exit=True)
 
-    total_pages = (len(movies) + results_per_page - 1) // results_per_page
+    print('!$!'*27)
     current_page = 1
+    total_pages = (len(movies) + results_per_page - 1) // results_per_page
+    movies_list = [f"{movie[0]} ({movie[1]})" for movie in movies]
     item_name = 'found movie'
     selection = 'off'
 
     while True:
-        action = choose_page_action(current_page, total_pages, movies,
+        action = choose_page_action(current_page, total_pages, movies_list,
                                           item_name, selection, results_per_page)
-        print(action)
+
         if isinstance(action, str):
             if action == "exit":
                 input("\nPress any key to return to the main menu...")
@@ -112,12 +108,12 @@ def search_movie_interactive(cursor: sqlite3.Cursor) -> Optional[str]:
         current_page = action
 
 
-def insert_movie(cursor: sqlite3.Cursor, movie_name: str|None = None, skip_check: bool = False) -> None:
+def insert_movie(db: db, movie_name: str|None = None, skip_check: bool = False) -> None:
     """
     Inserts a new movie into the database, ensuring no duplicates.
 
     Args:
-        cursor (sqlite3.Cursor): The cursor object for executing SQL queries.
+        db: Database : The db: Database object for executing SQL queries.
         movie_name (Optional[str]): The movie title to add. If not provided, user will be asked to enter it.
         skip_check (bool): Whether to skip the duplicate check. Default is False.
     """
@@ -127,7 +123,7 @@ def insert_movie(cursor: sqlite3.Cursor, movie_name: str|None = None, skip_check
         v.validate_title_movie(movie_name, "movie title")
 
     if not skip_check:
-        existing_movies = find_movies_by_keyword(cursor, movie_name)
+        existing_movies = find_movies_by_keyword(movie_name)
         if any(movie[0].lower() == movie_name.lower() for movie in existing_movies):
             print(f"Movie '{movie_name}' already exists. Not adding a duplicate.")
             return
@@ -147,22 +143,23 @@ def insert_movie(cursor: sqlite3.Cursor, movie_name: str|None = None, skip_check
     genre = input("Enter the movie genre: ")
     if not genre:
         genre = input("Genre is not entered. Please enter the movie genre:")
-
-    insert_movies(cursor, [Movie(movie_name, release_year, genre)])
-    cursor.connection.commit()
+    db.start_savepoint()
+    db.insert_movies([Movie(movie_name, release_year, genre)])
+    db.release_savepoint()
     print(f"Movie '{movie_name}' added.")
 
 
-def insert_actor(cursor: sqlite3.Cursor) -> None:
+def insert_actor(db: db) -> None:
     """
     Inserts a new actor into the database and associates them with movies.
 
     Args:
-        cursor (sqlite3.Cursor): The SQLite database cursor.
+        db: Database (sqlite3.Cursor): The SQLite database db: Database.
     """
+    v = Validator()
     actor_name = input("Enter the actor's name: ")
-    validate_actor_name_genre(actor_name, "actor's name")
-    existing_actor = get_actor_id(cursor, actor_name)
+    v.validate_actor_name_genre(actor_name, "actor's name")
+    existing_actor = db.get_actor_id(actor_name)
     if not existing_actor:
         for _ in range(3):
             try:
@@ -174,9 +171,10 @@ def insert_actor(cursor: sqlite3.Cursor) -> None:
             print("Too many invalid attempts. Exiting...")
             return
 
-        insert_actors(cursor, [Actor(actor_name, birth_year)])
-        actor_id = cursor.lastrowid
-        cursor.connection.commit()
+        db.start_savepoint()
+        db.insert_actors([Actor(actor_name, birth_year)])
+        actor_id = db.cursor.lastrowid
+        db.release_savepoint()
         print(f"Actor '{actor_name}' added.")
     else:
         actor_id = existing_actor
@@ -184,33 +182,33 @@ def insert_actor(cursor: sqlite3.Cursor) -> None:
     add_film = input("Would you like to add a movie reference to this actor?"
                      " [yes, y, 1]: ").strip().lower()
     if add_film in ["yes", "y", "1"]:
-        movie_title = search_movie_interactive(cursor)
+        movie_title = search_movie_interactive(db)
 
         if not movie_title:
             add_new_movie = input("There is no such movie in the database, would you like to add a movie?"
                                   " [yes, y, 1]: ").strip().lower()
             if add_new_movie in ["yes", "y", "1"]:
-                insert_movie(cursor, movie_title, skip_check=True)
+                insert_movie(db, movie_name=movie_title, skip_check=True)
                 return
             print("Movie was not added. Actor remains unlinked.")
 
-        movie_id = get_movie_id(cursor, movie_title)
+        movie_id =db. get_movie_id(movie_title)
         cursor.execute("SELECT 1 FROM movie_cast WHERE movie_id = ? AND actor_id = ?",
                        (movie_id, actor_id))
         if cursor.fetchone():
             print(f"Actor '{actor_name}' is already associated with '{movie_title}'.")
         else:
-            insert_movie_cast(cursor, [MovieCast(movie_id, actor_id)])
+            db.insert_movie_cast([MovieCast(movie_id, actor_id)])
             cursor.connection.commit()
             print(f"Actor '{actor_name}' added to '{movie_title}'.")
 
 
-def show_movies_with_actors(cursor: sqlite3.Cursor) -> None:
+def show_movies_with_actors(db: db) -> None:
     """
     Displays all movies and their actors using pagination (15 results per page).
 
     Args:
-        cursor (sqlite3.Cursor): The cursor object for executing SQL queries.
+        db: Database (sqlite3.Cursor): The db: Database object for executing SQL queries.
     """
     current_page = 1
     page_size = 15
@@ -257,12 +255,12 @@ def show_movies_with_actors(cursor: sqlite3.Cursor) -> None:
             current_page = selected
 
 
-def get_unique_genres(cursor: sqlite3.Cursor) -> list:
+def get_unique_genres(db: db) -> list:
     """
     Retrieves all unique movie genres from the database.
 
     Args:
-        cursor (sqlite3.Cursor): The cursor object for executing SQL queries.
+        db: Database (sqlite3.Cursor): The db: Database object for executing SQL queries.
 
     Returns:
         list: A list of unique movie genres.
@@ -272,13 +270,13 @@ def get_unique_genres(cursor: sqlite3.Cursor) -> list:
     return [genre[0] for genre in genres]
 
 
-def show_genres(cursor: sqlite3.Cursor) -> int | str | None:
+def show_genres(db: db) -> int | str | None:
     """
     Displays a list of all unique movie genres with pagination (15 genres per page)
     and allows the user to navigate through the pages.
 
     Args:
-        cursor (sqlite3.Cursor): The cursor object for executing SQL queries.
+        db: Database (sqlite3.Cursor): The db: Database object for executing SQL queries.
 
     Returns:
         int | str | None:
@@ -286,7 +284,7 @@ def show_genres(cursor: sqlite3.Cursor) -> int | str | None:
             - str if user selects a genre
             - None if the user exits
     """
-    genres = get_unique_genres(cursor)
+    genres = get_unique_genres(db)
     results_per_page = 15
 
     if not genres:
@@ -295,9 +293,10 @@ def show_genres(cursor: sqlite3.Cursor) -> int | str | None:
 
     total_pages = (len(genres) + results_per_page - 1) // results_per_page
     current_page = 1
+    selection = 'off'
 
     while True:
-        selected = choose_page_action(current_page, total_pages, genres, "genre", results_per_page)
+        selected = choose_page_action(current_page, total_pages, genres, "genre", selection, results_per_page)
 
         if selected == "exit":
             return None  # Returning None if the user exits
@@ -309,14 +308,14 @@ def show_genres(cursor: sqlite3.Cursor) -> int | str | None:
             return selected  # Returning the selected genre
 
 
-def show_movie_count_by_genre(cursor: sqlite3.Cursor) -> None:
+def show_movie_count_by_genre(db: db) -> None:
     """
     Displays the number of movies for each genre.
 
     Args:
-        cursor (sqlite3.Cursor): The cursor object for executing SQL queries.
+        db: Database (sqlite3.Cursor): The db: Database object for executing SQL queries.
     """
-    genres = get_unique_genres(cursor)
+    genres = get_unique_genres(db)
 
     if not genres:
         print("No genres found.")
@@ -354,12 +353,12 @@ def register_functions(conn):
     conn.create_function("movie_age", 1, movie_age)
 
 
-def show_movies_with_age(cursor: sqlite3.Cursor) -> None:
+def show_movies_with_age(db: db) -> None:
     """
     Displays all movies with their respective ages (years since release).
 
     Args:
-        cursor (sqlite3.Cursor): The cursor object for executing SQL queries.
+        db: Database (sqlite3.Cursor): The db: Database object for executing SQL queries.
     """
     cursor.execute("SELECT title, release_year, movie_age(release_year) FROM movies")
     movies = cursor.fetchall()
@@ -374,14 +373,14 @@ def show_movies_with_age(cursor: sqlite3.Cursor) -> None:
         print(f"{i}. Movie: \"{movie_title}\" — {age} years")
 
 
-def search_genre_by_part_name(cursor: sqlite3.Cursor) -> str | None:
+def search_genre_by_part_name(db: db) -> str | None:
     """
     Prompts the user to enter a part of a genre name and returns the genre that matches the search.
 
     If no results are found, asks the user if they want to see all genres.
 
     Args:
-        cursor (sqlite3.Cursor): The cursor object for executing SQL queries.
+        db: Database (sqlite3.Cursor): The db: Database object for executing SQL queries.
 
     Returns:
         str: The genre selected by the user, or None if not found.
@@ -422,12 +421,12 @@ def search_genre_by_part_name(cursor: sqlite3.Cursor) -> str | None:
     return None
 
 
-def average_birth_year_of_actors_in_genre(cursor: sqlite3.Cursor, genre: str) -> float | None:
+def average_birth_year_of_actors_in_genre(db: db, genre: str) -> float | None:
     """
     Displays the average birth year of actors in movies of a specific genre.
 
     Args:
-        cursor (sqlite3.Cursor): The cursor object for executing SQL queries.
+        db: Database (sqlite3.Cursor): The db: Database object for executing SQL queries.
         genre (str): The genre of the movies to filter by.
 
     Returns:
@@ -449,12 +448,12 @@ def average_birth_year_of_actors_in_genre(cursor: sqlite3.Cursor, genre: str) ->
     return average_birth_year
 
 
-def fetch_actors_and_movies(cursor: sqlite3.Cursor, results_per_page: int = 10) -> None:
+def fetch_actors_and_movies(db: db, results_per_page: int = 10) -> None:
     """
     Fetches and displays names of all actors and movie titles in a paginated format using UNION.
 
     Args:
-        cursor (sqlite3.Cursor): The database cursor to execute queries.
+        db: Database (sqlite3.Cursor): The database db: Database to execute queries.
         results_per_page (int): Number of results to show per page.
     """
     cursor.execute("""
@@ -501,11 +500,9 @@ def main():
     The user can choose an action by inputting a corresponding number.
     The program will continue until the user chooses the "Exit" option (option 0).
     """
-    with connect_db("kinodb.db") as conn:
-        cursor = conn.cursor()
-        register_functions(conn)
+    with db('kinodb.db'):
         options = {
-            "1": insert_movie,
+            "1": lambda: insert_movie,
             "2": insert_actor,
             "3": search_movie_interactive,
             "4": show_movies_with_actors,
@@ -530,13 +527,13 @@ def main():
             if choice in options:
                 if choice == "9":
                     # Спеціальний випадок, де потрібно двічі викликати функцію
-                    genre = search_genre_by_part_name(cursor)
-                    options[choice](cursor, genre)
+                    genre = search_genre_by_part_name(db.cursor)
+                    options[choice](genre)
                 elif choice == "8":
                     # Можливо, вам потрібно буде обробляти специфічні випадки
-                    options[choice](cursor)
+                    options[choice](db.cursor)
                 else:
-                    options[choice](cursor)
+                    options[choice](db.cursor)
             else:
                 print("Invalid choice. Try again.")
 

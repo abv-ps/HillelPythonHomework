@@ -1,7 +1,51 @@
+"""
+- `choose_page_action`: Handles pagination and item selection.
+"""
 import re
+from typing import Callable, Any
 
-import re
 
+def ensure_cursor(func: Callable[..., Any]) -> Callable[..., Any]:
+    """
+    A decorator that ensures the database cursor is available before executing the function.
+
+    This decorator checks if the 'cursor' attribute exists and is not None. If the cursor
+    is unavailable, a ValueError will be raised. If the cursor is available, the decorated
+    function is executed.
+
+    Args:
+        func (Callable[..., Any]): The function to be decorated. It is expected to take `self`
+                                   as its first argument and any additional arguments.
+
+    Returns:
+        Callable[..., Any]: The wrapped function that checks for the cursor availability before
+                            execution.
+
+    Raises:
+        ValueError: If the database cursor is not available.
+    """
+
+    def wrapper(self, *args, **kwargs):
+        if not hasattr(self, 'cursor') or self.cursor is None:
+            raise ValueError("Database connection not established.")
+        return func(self, *args, **kwargs)
+
+    return wrapper
+
+
+class AutoEnsureCursorMeta(type):
+    """
+    A metaclass that automatically applies the `ensure_cursor` decorator to all methods of a class,
+    except for methods that do not require it (like `__init__`, `__enter__`, `__exit__`).
+    """
+    skip_cursor_check_methods = {'__init__', '__enter__', '__exit__'}
+
+    def __new__(mcs, name, bases, dct):
+        # Apply ensure_cursor to all methods except special ones
+        for key, value in dct.items():
+            if callable(value) and key not in mcs.skip_cursor_check_methods:
+                dct[key] = ensure_cursor(value)  # Apply the decorator to the method
+        return super().__new__(mcs, name, bases, dct)
 
 class Validator:
     def __init__(self):
@@ -148,3 +192,9 @@ def get_valid_movie_title(max_attempts: int = 3) -> str|None:
 
     print("Maximum attempts reached. Returning to main menu...")
     return go_to_main_menu(immediate_exit=True)
+
+def case_insensitive_collation(str1, str2):
+    """
+    A simple case-insensitive comparison function for SQLite.
+    """
+    return (str1.lower() > str2.lower()) - (str1.lower() < str2.lower())
