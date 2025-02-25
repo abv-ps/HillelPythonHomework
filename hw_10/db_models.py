@@ -22,9 +22,10 @@ This module is designed to simplify the process of working with a database that 
 """
 
 import sqlite3
-from typing import Optional, TypeVar, Generic, Type, Any
+from typing import Optional, TypeVar, Generic, Type, Any, ClassVar
 from dataclasses import dataclass
-from services import AutoEnsureCursorMeta
+from database_setup import Database as DBClass
+from services import case_insensitive_collation
 
 T = TypeVar("T", bound="BaseModel")
 
@@ -33,10 +34,10 @@ class BaseModel:
     """
     Base class for database models. Provides table metadata.
     """
-    TABLE_NAME: str
-    COLUMNS: tuple[str, ...]
-    PRIMARY_KEY: str | None
-    IDENTIFIER_COLUMN: str | None
+    TABLE_NAME: ClassVar[str]
+    COLUMNS: ClassVar[tuple[str, ...]]
+    PRIMARY_KEY: ClassVar[Optional[str]]
+    IDENTIFIER_COLUMN: ClassVar[Optional[str]]
 
 
 @dataclass
@@ -82,13 +83,13 @@ class MovieCast(BaseModel):
     IDENTIFIER_COLUMN = None
 
 
-class DatabaseHandler(Generic[T], metaclass=AutoEnsureCursorMeta):
+class DatabaseHandler(Generic[T]):
     """
     Handles batch insert operations and entity lookups for different database models.
     """
 
     @staticmethod
-    def insert(connection: sqlite3.Connection, data: list[T], model: Type[T]) -> None:
+    def insert(db: DBClass, data: list[T], model: Type[T]) -> None:
         """
         Inserts multiple records into the database.
 
@@ -100,7 +101,7 @@ class DatabaseHandler(Generic[T], metaclass=AutoEnsureCursorMeta):
         if not data:
             return
 
-        cursor = connection.cursor()
+        cursor = db.connection.cursor()
         table_name = model.TABLE_NAME
         columns = model.COLUMNS
         placeholders = ", ".join("?" for _ in columns)
@@ -109,7 +110,7 @@ class DatabaseHandler(Generic[T], metaclass=AutoEnsureCursorMeta):
         cursor.executemany(query, values)
 
     @staticmethod
-    def get_id(connection: sqlite3.Connection, model: Type[T],
+    def get_id(db: DBClass, model: Type[T],
                identifier_value: Any) -> Optional[int]:
         """
         Retrieves the entity ID by its identifier column.
@@ -122,7 +123,7 @@ class DatabaseHandler(Generic[T], metaclass=AutoEnsureCursorMeta):
         Returns:
             Optional[int]: The entity ID if found, otherwise None.
         """
-        cursor = connection.cursor()
+        cursor = db.connection.cursor()
         table_name = model.TABLE_NAME
         primary_key = model.PRIMARY_KEY
         identifier_column = model.IDENTIFIER_COLUMN
@@ -134,3 +135,40 @@ class DatabaseHandler(Generic[T], metaclass=AutoEnsureCursorMeta):
         cursor.execute(query, (identifier_value,))
         result = cursor.fetchone()
         return result[0] if result else None
+
+
+    @staticmethod
+    def find_by_keyword(db: Database, table: str, keyword: str,
+                        columns: Optional[list[str]] = None, order_by: Optional[str] = None) -> list:
+        """
+        Finds entries in a table matching a keyword.
+
+        Args:
+            db (Database): The database handler.
+            table (str): The table name to search in.
+            keyword (str): The keyword to search for.
+            columns (Optional[list[str]]): The list of columns to return (default is all).
+            order_by (Optional[str]): An optional column to order the results by.
+
+        Returns:
+            list: A list of matching rows from the database.
+        """
+        cursor = db.connection.cursor()
+
+        # Реєстрація колації "CI", якщо її ще немає
+        if not db.has_function("CI"):
+            db.connection.create_collation("CI", case_insensitive_collation)
+
+        if not columns:
+            columns = ["*"]  # Всі колонки за замовчуванням
+
+        # Формування запиту
+        query = f"SELECT {', '.join(columns)} FROM {table} WHERE {columns[0]} LIKE ? COLLATE CI"
+
+        if order_by:
+            query += f" ORDER BY {order_by}"
+
+        cursor.execute(query, (f"%{keyword}%",))
+        return cursor.fetchall() or []
+
+

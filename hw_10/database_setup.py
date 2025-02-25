@@ -196,6 +196,20 @@ class Database(metaclass=AutoEnsureCursorMeta):
         self.connection.create_function(func_name, num_args, func)
         print(f"Custom function '{func_name}' registered.")
 
+    def has_function(self, func_name: str) -> bool:
+        """
+        Checks if a custom function is already registered in SQLite.
+
+        Args:
+            func_name (str): The name of the function to check.
+
+        Returns:
+            bool: True if the function exists, False otherwise.
+        """
+        self.cursor.execute("PRAGMA function_list;")
+        functions = [row[1] for row in self.cursor.fetchall()]
+        return func_name in functions
+
 
 def load_csv(filename: str) -> list[list[str]]:
     """
