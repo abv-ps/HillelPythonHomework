@@ -3,6 +3,8 @@
 """
 import re
 from typing import Callable, Any
+from database_setup import Database as DBClass
+from db_models import MovieCast
 
 
 def ensure_cursor(func: Callable[..., Any]) -> Callable[..., Any]:
@@ -46,6 +48,7 @@ class AutoEnsureCursorMeta(type):
             if callable(value) and key not in mcs.skip_cursor_check_methods:
                 dct[key] = ensure_cursor(value)  # Apply the decorator to the method
         return super().__new__(mcs, name, bases, dct)
+
 
 class Validator:
     def __init__(self):
@@ -92,14 +95,14 @@ class Validator:
             if attempts < max_attempts:
                 print("\nTo return to the main menu, type 'exit' or 'q'.")
                 print(f"You have {max_attempts - attempts} attempts left.")
-                text = input(f"Enter the {item_name} again: ")
+                text = input(f"Please enter the {item_name} again: ")
         if text not in {"exit", "q"}:
             print("Maximum attempts reached. Invalid input.")
         return False
 
 
-def choose_page_action(current_page: int, items: list, item_name: str,
-                       selection: str = 'on', results_per_page: int = 15) -> str | int:
+def choose_page_action(items: list, item_name: str, current_page: int = 1,
+                       selection: str = 'off', results_per_page: int = 15) -> str:
     """
     Prompts the user to choose an item or navigate between pages (next, prev).
 
@@ -112,7 +115,7 @@ def choose_page_action(current_page: int, items: list, item_name: str,
         results_per_page (int): The number of items to display per page (default is 15).
 
     Returns:
-        str|int: The name of the selected item or the new current page number if user navigates between pages.
+        str: The name of the selected item or the 'exit' command to return to the main menu.
     """
     total_pages = (len(items) + results_per_page - 1) // results_per_page  # Обчислюємо кількість сторінок
 
@@ -122,7 +125,7 @@ def choose_page_action(current_page: int, items: list, item_name: str,
         page_items = items[start_index:end_index]
 
         print(f"Page {current_page} of {total_pages}\n")
-        print(f"Showing {item_name}s {start_index + 1}-{start_index + 
+        print(f"Showing {item_name}s {start_index + 1}-{start_index +
                                                         len(page_items)} of {len(items)}\n")
 
         print(f"Type 'next'|'+1' to go to the next page "
@@ -130,7 +133,6 @@ def choose_page_action(current_page: int, items: list, item_name: str,
 
         if selection == 'on':
             print("Select a {item_name} ({start_index + 1}-{start_index + len(page_items)})")
-
 
         for i, item in enumerate(page_items, 1):
             print(f"{start_index + i}. {item}")
@@ -159,6 +161,7 @@ def choose_page_action(current_page: int, items: list, item_name: str,
             print("You are already on the first page.")
         return "exit"
 
+
 def go_to_main_menu() -> None:
     """
     Prompts the user to return to the main menu.
@@ -175,6 +178,7 @@ def case_insensitive_collation(str1, str2):
     A simple case-insensitive comparison function for SQLite.
     """
     return (str1.lower() > str2.lower()) - (str1.lower() < str2.lower())
+
 
 def handle_no_items_found(item_name: str, items_func: Callable[[], Any],
                           go_to_main_menu: Callable[[], None],
@@ -215,39 +219,67 @@ def handle_no_items_found(item_name: str, items_func: Callable[[], Any],
             print("Invalid option. Please select 1, 2, or 3.")
 
 
-def add_reference(item1: str, item2: str, func1: Callable[[], Any], func2: Callable[[], Any],
-                  insert_func: Callable[[], None]) -> None:
+def add_reference(db: DBClass, item1: str, item2: str, item_id: int|None,
+                  func1: Callable[[DBClass, str], list],
+                  func2: Callable[[], None],
+                  insert_func: Callable[[Any], None]) -> None:
     """
     Prompts the user to add a reference between two items in the database.
 
     Args:
-        item1 (str): The name of the first item (e.g., "actor").
-        item2 (str): The name of the second item (e.g., "movie").
-        func1 (Callable[[], Any]): Function to search for the first item in the database.
-        func2 (Callable[[], Any]): Function to add a new item if it does not exist.
-        insert_func (Callable[[], None]): Function to insert the reference between the two items.
+        db (DBClass): The database object.
+        item1 (str): The name of the first item to add reference (e.g., "actor").
+        item2 (str): The name of the second item to add reference (e.g., "movie").
+        func1 (Callable[[DBClass, str], list]): Function to search for the first item in the database.
+        func2 (Callable[[DBClass, str], None]): Function to add a new item if it does not exist.
+        insert_func (Callable[[int, int], None]): Function to insert the reference between the two items.
 
     Returns:
         None
     """
-    # Ask the user if they want to add a reference between item1 and item2
     add_ref = input(f"Would you like to add a {item1} reference to this {item2}? "
                     f"[yes, y, 1]: ").strip().lower()
 
-    if add_ref in ["yes", "y", "1"]:
-        # Search for the first item in the database
-        search_item1 = func1()  # Example: search for actor
-        if not search_item1:
-            # If the item doesn't exist, ask the user if they want to add it
-            add_new_item1 = input(
-                f"There is no such {item1} in the database, would you like to add a {item1}? [yes, y, 1]: ").strip().lower()
-            if add_new_item1 in ["yes", "y", "1"]:
-                # If the user wants to add a new item, call the function to add it
-                func2()  # Example: add a new actor
-            else:
-                print(f"{item1.capitalize()} was not added. {item2.capitalize()} remains unlinked.")
-                return
-        # After ensuring that item1 exists (either searched or added), proceed with the reference
-        insert_func()  # Insert the reference between the two items (e.g., insert actor to movie)
-    return go_to_main_menu()
+    if add_ref not in ["yes", "y", "1"]:
+        return go_to_main_menu()
 
+    # Пошук першого елемента
+    item_part = input(f"Please enter the part of the {item1} to search in database: ")
+    search_results = func1(db, item_part)
+
+    if search_results:
+        # Отримуємо ім'я елементів (назва фільму чи ім'я актора)
+        search_item1 = [item[0] for item in search_results]
+
+        if len(search_item1) > 1:
+            selection = choose_page_action(
+                items=search_item1,
+                item_name=f"found {item1}",
+                selection='on'
+            )
+            if selection == "exit":
+                return go_to_main_menu()
+            search_item1 = selection
+        else:
+            search_item1 = search_item1[0]
+    else:
+        add_new_item1 = input(
+            f"There is no such {item1} in the database, would you like to add a {item1}? [yes, y, 1]: ").strip().lower()
+        if add_new_item1 in ["yes", "y", "1"]:
+            func2()  # Додаємо новий запис
+            search_results = func1(db, item_part)  # Повторний пошук
+            if not search_results:
+                print(f"Failed to add {item1}.")
+                return go_to_main_menu()
+            search_item1 = search_results[0]  # Беремо ID
+        else:
+            print(f"{item1.capitalize()} was not added. {item2.capitalize()} remains unlinked.")
+            return go_to_main_menu()
+    get_id_func = getattr(DBClass, f"get_{item1}_id", None)
+    if get_id_func:
+        # Викликаємо функцію з параметрами
+        moviecast_list: MovieCast = MovieCast(get_id_func(search_item1), item_id)
+        insert_func(moviecast_list)
+        print(f"Reference between {item1} and {item2} added successfully.")
+
+    return go_to_main_menu()

@@ -140,23 +140,23 @@ class Database(metaclass=AutoEnsureCursorMeta):
 
     def insert_movies(self, movies: list[Movie]) -> None:
         """Inserts a list of movies into the database."""
-        DatabaseHandler.insert(self.connection, movies, Movie)
+        DatabaseHandler.insert(self, movies, Movie)
 
     def insert_actors(self, actors: list[Actor]) -> None:
         """Inserts a list of actors into the database."""
-        DatabaseHandler.insert(self.connection, actors, Actor)
+        DatabaseHandler.insert(self, actors, Actor)
 
     def insert_movie_cast(self, movie_cast: list[MovieCast]) -> None:
         """Inserts movie-actor relationships into the database."""
-        DatabaseHandler.insert(self.connection, movie_cast, MovieCast)
+        DatabaseHandler.insert(self, movie_cast, MovieCast)
 
     def get_movie_id(self, title: str) -> Optional[int]:
         """Retrieves a movie ID by title."""
-        return DatabaseHandler.get_id(self.connection, Movie, title)
+        return DatabaseHandler.get_id(self, Movie, title)
 
     def get_actor_id(self, name: str) -> Optional[int]:
         """Retrieves an actor ID by name."""
-        return DatabaseHandler.get_id(self.connection, Actor, name)
+        return DatabaseHandler.get_id(self, Actor, name)
 
     def start_savepoint(self):
         """Starts a SAVEPOINT."""

@@ -138,7 +138,7 @@ class DatabaseHandler(Generic[T]):
 
 
     @staticmethod
-    def find_by_keyword(db: Database, table: str, keyword: str,
+    def find_by_keyword(db: DBClass, table: str, keyword: str,
                         columns: Optional[list[str]] = None, order_by: Optional[str] = None) -> list:
         """
         Finds entries in a table matching a keyword.

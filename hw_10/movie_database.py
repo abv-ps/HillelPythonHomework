@@ -96,30 +96,6 @@ def find_actors_by_keyword(db: DBClass, keyword: str) -> list[tuple[str, int]]:
 
     return [(actor[0], actor[1]) for actor in result] if result else []
 
-def find_actors_by_keyword(db: DBClass, keyword: str) -> List[str]:
-    """
-    Searches for movies by keyword without user interaction.
-
-    Args:
-        db: Database : The db: Database object for executing SQL queries.
-        keyword (str): The keyword to search for in movie titles.
-
-    Returns:
-        List[str]: A list of movie titles matching the keyword.
-    """
-    db.register_custom_function("CI", 2, case_insensitive_collation)
-    query = """
-                SELECT title, release_year 
-                FROM movies 
-                WHERE title LIKE ? COLLATE CI 
-                ORDER BY title
-            """
-
-    result: list = db.execute_query(query, (f"%{keyword}%",))
-
-    return [(movie[0], movie[1]) for movie in result] if result else []
-
-
 def search_movie_interactive(db: DBClass) -> Optional[str]:
     """
     Prompts the user to search for a movie by a part of its title, using pagination.
@@ -144,15 +120,12 @@ def search_movie_interactive(db: DBClass) -> Optional[str]:
                     retry_func=search_movie_interactive(db)
                 )
 
-
     movies_list = [f"{movie[0]} ({movie[1]})" for movie in movies]
 
     while True:
         action = choose_page_action(
-            current_page = 1,
             items = movies_list,
-            item_name = 'found movie',
-            selection = 'off'
+            item_name = 'found movie'
         )
 
         if action == "exit":
@@ -170,40 +143,53 @@ def insert_movie(db: DBClass, movie_name: str|None = None, skip_check: bool = Fa
         skip_check (bool): Whether to skip the duplicate check. Default is False.
     """
     if not movie_name:
-        movie_name = input("Enter the movie title to add: ")
+        movie_name = input("Please enter the movie title to add: ")
         v = Validator()
-        v.validate_title_movie(movie_name, "movie title")
+        if not v.validate_title_movie(movie_name, "movie title"):
+            return go_to_main_menu()
 
     if not skip_check:
         existing_movies = find_movies_by_keyword(movie_name)
         if any(movie[0].lower() == movie_name.lower() for movie in existing_movies):
             print(f"Movie '{movie_name}' already exists. Not adding a duplicate.")
-            return
+            return go_to_main_menu()
 
     for _ in range(3):
         try:
-            release_year = int(input("Enter the movie release year: "))
+            release_year = int(input("To add the movie to the database, "
+                                     "please enter its release year: "))
             if 1900 <= release_year <= 2100:
                 break
             print("Please enter a valid year between 1900 and 2100.")
         except ValueError:
             print("Invalid release year. Please enter a valid number.")
     else:
-        print("Too many invalid attempts. Exiting...")
-        return
+        print("Maximum attempts reached. Invalid input.")
+        return go_to_main_menu()
 
     genre = input("Enter the movie genre: ")
     if not genre:
         genre = input("Genre is not entered. Please enter the movie genre:")
+    if genre:
+        v = Validator()
+        if not v.validate_actor_name_genre(genre, "genre"):
+            print(f"The genre {genre} does not meet the requirements, "
+                  f"so no genre is added to the movie '{movie_name}'.")
+            genre = ''
     db.start_savepoint()
     db.insert_movies([Movie(movie_name, release_year, genre)])
     db.release_savepoint()
     print(f"Movie '{movie_name}' added.")
     add_reference(
-        item1 = 'actor',
-        item2 = 'movie',
-        func1 =
+        db=db,
+        item1='actor',
+        item2='movie',
+        item_id=db.get_movie_id(title=movie_name),
+        func1 = lambda db, keyword: find_actors_by_keyword(db, keyword),
+        func2 = lambda: insert_actor(db, movie_name),
+        insert_func=lambda movie_cast:db.insert_movie_cast(movie_cast)
     )
+
 
 
 
@@ -573,7 +559,7 @@ def main():
     """
     with DBClass('kinodb.db') as db:
         options = {
-            "1": lambda [db]: insert_movie,
+            "1": lambda: insert_movie,
             "2": lambda: insert_actor,
             "3": lambda: search_movie_interactive,
             "4": lambda: show_movies_with_actors,
