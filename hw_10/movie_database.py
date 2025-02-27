@@ -36,7 +36,7 @@ analytical results in a user-friendly manner with pagination support.
 
 import sys
 import datetime
-from typing import Optional, List
+from typing import Optional, Callable, Any
 from database_setup import Database as DBClass
 from db_models import (
     Movie,
@@ -49,8 +49,7 @@ from services import (
     choose_page_action,
     go_to_main_menu,
     case_insensitive_collation,
-    handle_no_items_found,
-    add_reference
+    handle_no_items_found
 )
 
 
@@ -66,7 +65,7 @@ def find_movies_by_keyword(db: DBClass, keyword: str) -> list[tuple[str, int]]:
         list[tuple[str, int]]: A list of tuples containing movie titles and release years.
     """
     result = DBHandler.find_by_keyword(
-        db=db,
+        connection=db.connection,
         table="movies",
         keyword=keyword,
         columns=["title", "release_year"],
@@ -87,14 +86,14 @@ def find_actors_by_keyword(db: DBClass, keyword: str) -> list[tuple[str, int]]:
         list[tuple[str, int]]: A list of tuples containing movie titles and release years.
     """
     result = DBHandler.find_by_keyword(
-        db=db,
+        connection=db.connection,
         table="actors",
         keyword=keyword,
         columns=["name", "birth_year"],
         order_by="name"
     )
 
-    return [(actor[0], actor[1]) for actor in result] if result else []
+    return list(set((actor[0], actor[1]) for actor in result)) if result else []
 
 def search_movie_interactive(db: DBClass) -> Optional[str]:
     """
@@ -108,8 +107,11 @@ def search_movie_interactive(db: DBClass) -> Optional[str]:
     """
     movie_name = input("Enter the movie title to add:").strip()
     v = Validator()
-    if not v.validate_title_movie(movie_name, "movie title"):
+    movie_name_sub = v.validate_title_movie(movie_name, "movie title")
+    if not movie_name_sub[0]:
         return go_to_main_menu()
+    else:
+        movie_name = movie_name_sub[1]
 
     movies = find_movies_by_keyword(db, movie_name)
 
@@ -145,14 +147,22 @@ def insert_movie(db: DBClass, movie_name: str|None = None, skip_check: bool = Fa
     if not movie_name:
         movie_name = input("Please enter the movie title to add: ")
         v = Validator()
-        if not v.validate_title_movie(movie_name, "movie title"):
+        movie_name_sub = v.validate_title_movie(movie_name, "movie title")
+        if not movie_name_sub[0]:
             return go_to_main_menu()
+        else:
+            movie_name = movie_name_sub[1]
 
     if not skip_check:
-        existing_movies = find_movies_by_keyword(movie_name)
-        if any(movie[0].lower() == movie_name.lower() for movie in existing_movies):
+        existing_movies = find_movies_by_keyword(db, movie_name)
+        if existing_movies:
             print(f"Movie '{movie_name}' already exists. Not adding a duplicate.")
-            return go_to_main_menu()
+            user_choice = input(
+                "Would you like to add another movie? [yes, y, 1] or go back to the main menu [no, n]: ").strip().lower()
+            if user_choice in ["yes", "y", "1"]:
+                insert_movie(db)
+            else:
+                return go_to_main_menu()
 
     for _ in range(3):
         try:
@@ -172,19 +182,23 @@ def insert_movie(db: DBClass, movie_name: str|None = None, skip_check: bool = Fa
         genre = input("Genre is not entered. Please enter the movie genre:")
     if genre:
         v = Validator()
-        if not v.validate_actor_name_genre(genre, "genre"):
-            print(f"The genre {genre} does not meet the requirements, "
+        genre_sub = v.validate_actor_name_genre(genre, "genre")
+        if not genre_sub[0]:
+            print(f"The genre {genre_sub[1]} does not meet the requirements, "
                   f"so no genre is added to the movie '{movie_name}'.")
             genre = ''
+        else:
+            genre = genre_sub[1]
     db.start_savepoint()
     db.insert_movies([Movie(movie_name, release_year, genre)])
+    movie_id = db.cursor.lastrowid
     db.release_savepoint()
     print(f"Movie '{movie_name}' added.")
     add_reference(
         db=db,
         item1='actor',
         item2='movie',
-        item_id=db.get_movie_id(title=movie_name),
+        item_id=movie_id,
         func1 = lambda db, keyword: find_actors_by_keyword(db, keyword),
         func2 = lambda: insert_actor(db, movie_name),
         insert_func=lambda movie_cast:db.insert_movie_cast(movie_cast)
@@ -200,15 +214,21 @@ def insert_actor(db: DBClass, movie_name: str|None = None) -> None:
     Args:
         db: Database (sqlite3.Cursor): The SQLite database db: Database.
     """
-    v = Validator()
     actor_name = input("Enter the actor's name: ")
-    v.validate_actor_name_genre(actor_name, "actor's name")
+    v = Validator()
+    actor_name_sub = v.validate_actor_name_genre(actor_name, "actor's name")
+    if not actor_name_sub[0]:
+        return go_to_main_menu()
+    else:
+        actor_name = actor_name_sub[1]
     existing_actor = db.get_actor_id(actor_name)
     if not existing_actor:
         for _ in range(3):
             try:
                 birth_year = int(input("Enter the actor's birth year: "))
-                break
+                if 1900 <= birth_year <= 2100:
+                    break
+                print("Please enter a valid year between 1900 and 2100.")
             except ValueError:
                 print("Invalid birth year. Please enter a valid number.")
         else:
@@ -223,80 +243,77 @@ def insert_actor(db: DBClass, movie_name: str|None = None) -> None:
     else:
         actor_id = existing_actor
 
-    add_film = input("Would you like to add a movie reference to this actor?"
-                     " [yes, y, 1]: ").strip().lower()
-    if add_film in ["yes", "y", "1"]:
-        movie_title = search_movie_interactive(db)
-
-        if not movie_title:
-            add_new_movie = input("There is no such movie in the database, would you like to add a movie?"
-                                  " [yes, y, 1]: ").strip().lower()
-            if add_new_movie in ["yes", "y", "1"]:
-                insert_movie(db, movie_name=movie_title, skip_check=True)
-                return
-            print("Movie was not added. Actor remains unlinked.")
-
-        movie_id =db. get_movie_id(movie_title)
-        cursor.execute("SELECT 1 FROM movie_cast WHERE movie_id = ? AND actor_id = ?",
-                       (movie_id, actor_id))
-        if cursor.fetchone():
-            print(f"Actor '{actor_name}' is already associated with '{movie_title}'.")
-        else:
-            db.insert_movie_cast([MovieCast(movie_id, actor_id)])
-            cursor.connection.commit()
-            print(f"Actor '{actor_name}' added to '{movie_title}'.")
+    add_reference(
+        db=db,
+        item1='movie',
+        item2='actor',
+        item_id=actor_id,
+        func1=lambda db, keyword: find_movies_by_keyword(db, keyword),
+        func2=lambda: insert_movie(db, movie_name),
+        insert_func=lambda movie_cast: db.insert_movie_cast(movie_cast)
+    )
 
 
-def show_movies_with_actors(db: DBClass) -> None:
+def show_movies_with_actors_with_pagination(db: DBClass, page: int = 1,
+                                            page_size: int = 15) -> None:
     """
     Displays all movies and their actors using pagination (15 results per page).
 
     Args:
         db: Database (sqlite3.Cursor): The db: Database object for executing SQL queries.
     """
-    current_page = 1
-    page_size = 15
+    connection = db.connection
+    cursor = connection.cursor()
 
-    # Get the total count of movies for pagination
-    cursor.execute("SELECT COUNT(*) FROM movies")
-    total_movies = cursor.fetchone()[0]
-    total_pages = (total_movies + page_size - 1) // page_size
+    offset = (page - 1) * page_size
 
-    while True:
-        offset = (current_page - 1) * page_size
-
-        cursor.execute('''
+    query = '''
             SELECT m.title, COALESCE(GROUP_CONCAT(a.name, ', '), 'No actors listed') AS actors
             FROM movies m
             LEFT JOIN movie_cast mc ON m.id = mc.movie_id
             LEFT JOIN actors a ON mc.actor_id = a.id
             GROUP BY m.id
             LIMIT ? OFFSET ?
-        ''', (page_size, offset))
+        '''
 
-        movies_actors = cursor.fetchall()
+    cursor.execute(query, (page_size, offset))
+    movies_actors = cursor.fetchall()
 
-        if not movies_actors:
-            print("No more movies available.")
-            break
+    cursor.execute('SELECT COUNT(*) FROM movies')
+    total_movies = cursor.fetchone()[0]
+    total_pages = (total_movies + page_size - 1) // page_size
 
-        formatted_movies = [
-            f"Movie: \"{movie_title}\", Actors: {actors}"
-            for movie_title, actors in movies_actors
-        ]
+    if not movies_actors:
+        print("No movies found on this page.")
+        return go_to_main_menu()
 
-        selected = choose_page_action(current_page, total_pages, formatted_movies, "movie", page_size)
+    max_title_length = max(len(movie[0]) for movie in movies_actors)
 
-        if isinstance(selected, str):
-            if selected == "exit":
-                return
-            movie_index = int(selected.split(".")[0]) - 1
-            movie_title = movies_actors[movie_index][0]
-            print(f"You selected the movie: {movie_title}")
-            break
+    print(f"Page {page} of {total_pages}\n")
+    print(f"Showing movies and actors {offset + 1}-{min(offset + page_size, total_movies)} "
+          f"of {total_movies}\n")
 
-        if isinstance(selected, int):  # Перехід між сторінками
-            current_page = selected
+    for idx, (movie_title, actors) in enumerate(movies_actors, start=offset + 1):
+        padding = ' ' * (max_title_length - len(movie_title) + 4 - len(str(idx)))
+        print(f"{idx}. Movie: \"{movie_title}\"{padding}Actors: {actors}")
+
+    if page < total_pages:
+        print(f"Type 'next / +1' to go to the next page.")
+    if page > 1:
+        print(f"Type 'prev / -1' to go to the previous page.")
+    print("Type 'exit' to quit.")
+
+    user_input = input("Your choice: ").strip().lower()
+
+    if user_input in ['next', '+1'] and page < total_pages:
+        show_movies_with_actors_with_pagination(db, page + 1, page_size)
+    elif user_input in ['prev', '-1'] and page > 1:
+        show_movies_with_actors_with_pagination(db, page - 1, page_size)
+    elif user_input == 'exit':
+        return go_to_main_menu()
+    else:
+        print("Invalid input. Please try again.")
+        show_movies_with_actors_with_pagination(db, page, page_size)
 
 
 def get_unique_genres(db: DBClass) -> list:
@@ -537,6 +554,79 @@ def fetch_actors_and_movies(db: DBClass, results_per_page: int = 10) -> None:
             break
 
 
+def add_reference(db: DBClass, item1: str, item2: str, item_id: int|None,
+                  func1: Callable[[DBClass, str], list],
+                  func2: Callable[[], None],
+                  insert_func: Callable[[Any], None]) -> None:
+    """
+    Prompts the user to add a reference between two items in the database.
+
+    Args:
+        db (DBClass): The database object.
+        item1 (str): The name of the first item to add reference (e.g., "actor").
+        item2 (str): The name of the second item to add reference (e.g., "movie").
+        func1 (Callable[[DBClass, str], list]): Function to search for the first item in the database.
+        func2 (Callable[[DBClass, str], None]): Function to add a new item if it does not exist.
+        insert_func (Callable[[int, int], None]): Function to insert the reference between the two items.
+
+    Returns:
+        None
+    """
+    add_ref = input(f"Would you like to add a {item1} reference to this {item2}? "
+                    f"[yes, y, 1] or go back to the main menu [no, n]: ").strip().lower()
+
+    if add_ref not in ["yes", "y", "1"]:
+        return go_to_main_menu()
+
+    # Пошук першого елемента
+    item_part = input(f"Please enter the part of the {item1} to search in database: ")
+    search_results = func1(db, item_part)
+
+    if search_results:
+        # Отримуємо ім'я елементів (назва фільму чи ім'я актора)
+        search_item1 = [item[0] for item in search_results]
+
+        if len(search_item1) > 1:
+            selection = choose_page_action(
+                items=search_item1,
+                item_name=f"found {item1}",
+                selection='on'
+            )
+            if selection == "exit":
+                return go_to_main_menu()
+            search_item1 = selection
+        else:
+            search_item1 = search_item1[0]
+    else:
+        add_new_item1 = input(
+            f"There is no such {item1} in the database, would you like to add a {item1}? [yes, y, 1]: ").strip().lower()
+        if add_new_item1 in ["yes", "y", "1"]:
+            func2()  # Додаємо новий запис
+            search_results = func1(db, item_part)  # Повторний пошук
+            if not search_results:
+                print(f"Failed to add {item1}.")
+                return go_to_main_menu()
+            search_item1 = search_results[0]  # Беремо ID
+        else:
+            print(f"{item1.capitalize()} was not added. {item2.capitalize()} remains unlinked.")
+            return go_to_main_menu()
+    get_id_func = getattr(DBClass, f"get_{item1}_id", None)
+    if get_id_func:
+        # Викликаємо функцію з параметрами
+        item1_id = get_id_func(search_item1)
+
+        if item1_id:
+            # Створюємо список об'єктів MovieCast
+            moviecast_list = [MovieCast(item1_id, item_id)]  # Додаємо до списку
+
+            # Викликаємо insert_func для додавання відношення
+            insert_func(moviecast_list)
+
+            print(f"Reference between {item1} and {item2} added successfully.")
+
+    return go_to_main_menu()
+
+
 def main():
     """
     Main function for managing the movie database application.
@@ -559,38 +649,35 @@ def main():
     """
     with DBClass('kinodb.db') as db:
         options = {
-            "1": lambda: insert_movie,
-            "2": lambda: insert_actor,
-            "3": lambda: search_movie_interactive,
-            "4": lambda: show_movies_with_actors,
-            "5": lambda: show_genres,
-            "6": lambda: show_movie_count_by_genre,
-            "7": lambda: show_movies_with_age,
-            "8": lambda: search_genre_by_part_name,
-            "9": lambda: average_birth_year_of_actors_in_genre,
-            "10": lambda: fetch_actors_and_movies,
-            "0": lambda: None
+            "1": insert_movie,
+            "2": insert_actor,
+            "3": search_movie_interactive,
+            "4": show_movies_with_actors_with_pagination,
+            "5": show_genres,
+            "6": show_movie_count_by_genre,
+            "7": show_movies_with_age,
+            "8": search_genre_by_part_name,
+            "9": average_birth_year_of_actors_in_genre,
+            "10": fetch_actors_and_movies,
+            "0": lambda: sys.exit(1)  # Завершення роботи програми
         }
 
         while True:
             print("Hello! Welcome to the movie database menu. How would you like to proceed?")
             print("\n1. Add Movie\n2. Add Actor\n3. Search Movie by keyword"
-                  "\n4. Show all movies with actors\n5. Show all genres"
+                  "\n4. Show all movies with actors (with pagination)\n5. Show all genres"
                   "\n6. Show movie count by genre\n7. Show movies with age"
                   "\n8. Search genre by part name\n9. Show average birth year of actors in genre"
                   "\n10. Show names of all actors and titles of all movies\n0. Exit")
             choice = input("Choose an option: ")
 
             if choice in options:
+                # Спеціальний випадок для опції "9"
                 if choice == "9":
-                    # Спеціальний випадок, де потрібно двічі викликати функцію
-                    genre = search_genre_by_part_name(db)
-                    options[choice](db, genre)
-                elif choice == "8":
-                    # Можливо, вам потрібно буде обробляти специфічні випадки
-                    options[choice](db)
+                    genre = search_genre_by_part_name(db)  # Отримуємо жанр
+                    options[choice](db, genre)  # Викликаємо функцію з жанром
                 else:
-                    options[choice](db)
+                    options[choice](db)  # Для всіх інших викликаємо функцію з db
             else:
                 print("Invalid choice. Try again.")
 

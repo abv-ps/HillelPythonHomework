@@ -24,7 +24,6 @@ This module is designed to simplify the process of working with a database that 
 import sqlite3
 from typing import Optional, TypeVar, Generic, Type, Any, ClassVar
 from dataclasses import dataclass
-from database_setup import Database as DBClass
 from services import case_insensitive_collation
 
 T = TypeVar("T", bound="BaseModel")
@@ -89,7 +88,7 @@ class DatabaseHandler(Generic[T]):
     """
 
     @staticmethod
-    def insert(db: DBClass, data: list[T], model: Type[T]) -> None:
+    def insert(connection: sqlite3.Connection, data: list[T], model: Type[T]) -> None:
         """
         Inserts multiple records into the database.
 
@@ -101,7 +100,7 @@ class DatabaseHandler(Generic[T]):
         if not data:
             return
 
-        cursor = db.connection.cursor()
+        cursor = connection.cursor()
         table_name = model.TABLE_NAME
         columns = model.COLUMNS
         placeholders = ", ".join("?" for _ in columns)
@@ -110,7 +109,7 @@ class DatabaseHandler(Generic[T]):
         cursor.executemany(query, values)
 
     @staticmethod
-    def get_id(db: DBClass, model: Type[T],
+    def get_id(connection: sqlite3.Connection, model: Type[T],
                identifier_value: Any) -> Optional[int]:
         """
         Retrieves the entity ID by its identifier column.
@@ -123,7 +122,7 @@ class DatabaseHandler(Generic[T]):
         Returns:
             Optional[int]: The entity ID if found, otherwise None.
         """
-        cursor = db.connection.cursor()
+        cursor = connection.cursor()
         table_name = model.TABLE_NAME
         primary_key = model.PRIMARY_KEY
         identifier_column = model.IDENTIFIER_COLUMN
@@ -138,7 +137,7 @@ class DatabaseHandler(Generic[T]):
 
 
     @staticmethod
-    def find_by_keyword(db: DBClass, table: str, keyword: str,
+    def find_by_keyword(connection: sqlite3.Connection, table: str, keyword: str,
                         columns: Optional[list[str]] = None, order_by: Optional[str] = None) -> list:
         """
         Finds entries in a table matching a keyword.
@@ -153,11 +152,10 @@ class DatabaseHandler(Generic[T]):
         Returns:
             list: A list of matching rows from the database.
         """
-        cursor = db.connection.cursor()
+        cursor = connection.cursor()
 
-        # Реєстрація колації "CI", якщо її ще немає
-        if not db.has_function("CI"):
-            db.connection.create_collation("CI", case_insensitive_collation)
+        connection.create_collation("CI", case_insensitive_collation)
+
 
         if not columns:
             columns = ["*"]  # Всі колонки за замовчуванням
@@ -169,6 +167,7 @@ class DatabaseHandler(Generic[T]):
             query += f" ORDER BY {order_by}"
 
         cursor.execute(query, (f"%{keyword}%",))
+
         return cursor.fetchall() or []
 
 

@@ -2,9 +2,7 @@
 - `choose_page_action`: Handles pagination and item selection.
 """
 import re
-from typing import Callable, Any
-from database_setup import Database as DBClass
-from db_models import MovieCast
+from typing import Callable, Any, Tuple
 
 
 def ensure_cursor(func: Callable[..., Any]) -> Callable[..., Any]:
@@ -54,7 +52,7 @@ class Validator:
     def __init__(self):
         self.patterns = {
             "title_movie": r"^([A-Za-zА-Яа-яІіЇїЄєҐґЁёЄєҐґ0-9-_@]{2,})(?:\s([A-Za-zА-Яа-яІіЇїЄєҐґЁёЄєҐґ0-9-_@]{2,}))*$",
-            "actor_name_genre": r"^([A-Za-zА-Яа-яІіЇїЄєҐґЁёЄєҐґ-_]{2,})(?:\s([A-Za-zА-Яа-яІіЇїЄєҐґЁёЄєҐґ-_]{2,}))*$"
+            "actor_name_genre": r"^([A-Za-zА-Яа-яІіЇїЄєҐґЁёЄєҐґ_-]{2,})(?:\s([A-Za-zА-Яа-яІіЇїЄєҐґЁёЄєҐґ_-]{2,}))*$"
         }
 
     def validate(self, text: str, item_name: str, validation_type: str) -> bool:
@@ -63,42 +61,45 @@ class Validator:
             print(f"Invalid validation type: {validation_type}")
             return False
 
-        if re.match(pattern, text):
-            return True
-        print(f"Invalid {item_name}! The {item_name} should consist of at least two letters "
-              "at the beginning with a possible separator and at least two letters after it.")
-        return False
+        try:
+            if re.match(pattern, text):
+                return True
+        except:
+            print(f"Invalid {item_name}! The {item_name} should consist of at least two letters "
+                  "at the beginning with a possible separator and at least two letters after it.")
+            return False
 
-    def validate_title_movie(self, text: str, item_name: str, max_attempts: int = 3) -> bool:
+    def validate_title_movie(self, text: str, item_name: str, max_attempts: int = 3) -> Tuple[bool, str]:
         """Validate movie title with a limited number of attempts."""
         attempts = 0
         while attempts < max_attempts and text not in {"exit", "q"}:
             if self.validate(text, item_name, "title_movie"):
-                return True
+                return True, text
             attempts += 1
             if attempts < max_attempts:
                 print(f"You have {max_attempts - attempts} attempts left to enter"
                       f"the {item_name}.")
                 print("\nTo return to the main menu, type 'exit' or 'q'.")
-                text = input(f"Enter the {item_name} again: ")
+                text = input(f"Please enter the {item_name} again: ")
         if text not in {"exit", "q"}:
             print("Maximum attempts reached. Invalid input.")
-        return False
+        return False, text
 
-    def validate_actor_name_genre(self, text: str, item_name: str, max_attempts: int = 3) -> bool:
+    def validate_actor_name_genre(self, text: str, item_name: str, max_attempts: int = 3) -> Tuple[bool, str]:
         """Validate actor name or genre with a limited number of attempts."""
         attempts = 0
         while attempts < max_attempts and text not in {"exit", "q"}:
             if self.validate(text, item_name, "actor_name_genre"):
-                return True
+                return True, text
             attempts += 1
             if attempts < max_attempts:
+                print(f"You have {max_attempts - attempts} attempts left to enter"
+                      f"the {item_name}.")
                 print("\nTo return to the main menu, type 'exit' or 'q'.")
-                print(f"You have {max_attempts - attempts} attempts left.")
                 text = input(f"Please enter the {item_name} again: ")
         if text not in {"exit", "q"}:
             print("Maximum attempts reached. Invalid input.")
-        return False
+        return False, text
 
 
 def choose_page_action(items: list, item_name: str, current_page: int = 1,
@@ -219,67 +220,4 @@ def handle_no_items_found(item_name: str, items_func: Callable[[], Any],
             print("Invalid option. Please select 1, 2, or 3.")
 
 
-def add_reference(db: DBClass, item1: str, item2: str, item_id: int|None,
-                  func1: Callable[[DBClass, str], list],
-                  func2: Callable[[], None],
-                  insert_func: Callable[[Any], None]) -> None:
-    """
-    Prompts the user to add a reference between two items in the database.
 
-    Args:
-        db (DBClass): The database object.
-        item1 (str): The name of the first item to add reference (e.g., "actor").
-        item2 (str): The name of the second item to add reference (e.g., "movie").
-        func1 (Callable[[DBClass, str], list]): Function to search for the first item in the database.
-        func2 (Callable[[DBClass, str], None]): Function to add a new item if it does not exist.
-        insert_func (Callable[[int, int], None]): Function to insert the reference between the two items.
-
-    Returns:
-        None
-    """
-    add_ref = input(f"Would you like to add a {item1} reference to this {item2}? "
-                    f"[yes, y, 1]: ").strip().lower()
-
-    if add_ref not in ["yes", "y", "1"]:
-        return go_to_main_menu()
-
-    # Пошук першого елемента
-    item_part = input(f"Please enter the part of the {item1} to search in database: ")
-    search_results = func1(db, item_part)
-
-    if search_results:
-        # Отримуємо ім'я елементів (назва фільму чи ім'я актора)
-        search_item1 = [item[0] for item in search_results]
-
-        if len(search_item1) > 1:
-            selection = choose_page_action(
-                items=search_item1,
-                item_name=f"found {item1}",
-                selection='on'
-            )
-            if selection == "exit":
-                return go_to_main_menu()
-            search_item1 = selection
-        else:
-            search_item1 = search_item1[0]
-    else:
-        add_new_item1 = input(
-            f"There is no such {item1} in the database, would you like to add a {item1}? [yes, y, 1]: ").strip().lower()
-        if add_new_item1 in ["yes", "y", "1"]:
-            func2()  # Додаємо новий запис
-            search_results = func1(db, item_part)  # Повторний пошук
-            if not search_results:
-                print(f"Failed to add {item1}.")
-                return go_to_main_menu()
-            search_item1 = search_results[0]  # Беремо ID
-        else:
-            print(f"{item1.capitalize()} was not added. {item2.capitalize()} remains unlinked.")
-            return go_to_main_menu()
-    get_id_func = getattr(DBClass, f"get_{item1}_id", None)
-    if get_id_func:
-        # Викликаємо функцію з параметрами
-        moviecast_list: MovieCast = MovieCast(get_id_func(search_item1), item_id)
-        insert_func(moviecast_list)
-        print(f"Reference between {item1} and {item2} added successfully.")
-
-    return go_to_main_menu()
