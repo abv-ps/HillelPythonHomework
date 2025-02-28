@@ -75,65 +75,64 @@ class Validator:
         while attempts < max_attempts and text not in {"exit", "q"}:
             if self.validate(text, item_name, "title_movie"):
                 return True, text
-            attempts += 1
-            if attempts < max_attempts:
-                print(f"You have {max_attempts - attempts} attempts left to enter"
-                      f"the {item_name}.")
-                print("\nTo return to the main menu, type 'exit' or 'q'.")
-                text = input(f"Please enter the {item_name} again: ")
-        if text not in {"exit", "q"}:
-            print("Maximum attempts reached. Invalid input.")
+            attempts = update_attempts(attempts, max_attempts)
+            if attempts >= max_attempts:
+                return False, text
+            text = input(f"Please enter the {item_name} again: ").strip()
         return False, text
 
     def validate_actor_name_genre(self, text: str, item_name: str, max_attempts: int = 3) -> Tuple[bool, str]:
-        """Validate actor name or genre with a limited number of attempts."""
+        """Validate actor name or genre with a limited number of attempts using update_attempts."""
         attempts = 0
         while attempts < max_attempts and text not in {"exit", "q"}:
             if self.validate(text, item_name, "actor_name_genre"):
                 return True, text
-            attempts += 1
-            if attempts < max_attempts:
-                print(f"You have {max_attempts - attempts} attempts left to enter"
-                      f"the {item_name}.")
-                print("\nTo return to the main menu, type 'exit' or 'q'.")
-                text = input(f"Please enter the {item_name} again: ")
+
+            attempts = update_attempts(attempts, max_attempts)
+
+            if attempts >= max_attempts:
+                break
+
+            text = input(f"Please enter the {item_name} again: ")
+
         if text not in {"exit", "q"}:
             print("Maximum attempts reached. Invalid input.")
+
         return False, text
 
 
 def choose_page_action(items: list, item_name: str, current_page: int = 1,
-                       selection: str = 'off', results_per_page: int = 15) -> str:
+                       selection: str = 'off', results_per_page: int = 15,
+                       max_attempts: int = 3) -> str:
     """
     Prompts the user to choose an item or navigate between pages (next, prev).
 
     Args:
-        current_page (int): The current page number.
         items (list): The list of items to select from (e.g., movies, actors).
         item_name (str): The name of the item (e.g., "movie", "actor").
+        current_page (int): The current page number.
         selection (str): Determines if the user is prompted to select an item ('on')
-        or just navigate between pages. Default is 'on'.
+                         or just navigate between pages. Default is 'off'.
         results_per_page (int): The number of items to display per page (default is 15).
+        max_attempts (int): The maximum number of attempts for user input.
 
     Returns:
-        str: The name of the selected item or the 'exit' command to return to the main menu.
+        str: The name of the selected item or 'exit' to return to the main menu.
     """
     total_pages = (len(items) + results_per_page - 1) // results_per_page  # Обчислюємо кількість сторінок
+    attempts = 0  # Лічильник спроб
 
-    while True:
+    while attempts < max_attempts:
         start_index = (current_page - 1) * results_per_page
         end_index = start_index + results_per_page
         page_items = items[start_index:end_index]
 
         print(f"Page {current_page} of {total_pages}\n")
-        print(f"Showing {item_name}s {start_index + 1}-{start_index +
-                                                        len(page_items)} of {len(items)}\n")
-
-        print(f"Type 'next'|'+1' to go to the next page "
-              f"or 'prev'|'-1' to go to the previous page:")
+        print(f"Showing {item_name}s {start_index + 1}-{start_index + len(page_items)} of {len(items)}\n")
+        print(f"Type 'next'|'+1' to go to the next page or 'prev'|'-1' to go to the previous page:")
 
         if selection == 'on':
-            print("Select a {item_name} ({start_index + 1}-{start_index + len(page_items)})")
+            print(f"Select a {item_name} ({start_index + 1}-{start_index + len(page_items)})")
 
         for i, item in enumerate(page_items, 1):
             print(f"{start_index + i}. {item}")
@@ -160,7 +159,32 @@ def choose_page_action(items: list, item_name: str, current_page: int = 1,
                 current_page -= 1
                 continue
             print("You are already on the first page.")
-        return "exit"
+
+        # Оновлення кількості спроб
+        attempts = update_attempts(attempts, max_attempts)
+        if attempts >= max_attempts:
+            return "exit"
+
+    return "exit"
+
+
+def update_attempts(attempts: int, max_attempts: int) -> int:
+    """
+    Increments the number of attempts and checks if the limit is reached.
+
+    Args:
+        attempts (int): The current attempt count.
+        max_attempts (int): The maximum allowed attempts.
+
+    Returns:
+        int: Updated attempt count.
+    """
+    attempts += 1
+    if attempts >= max_attempts:
+        print("Maximum attempts reached. Returning to the main menu.")
+        return max_attempts  # Щоб вказати, що досягнуто ліміту
+    print(f"You have {max_attempts - attempts} attempts left.")
+    return attempts
 
 
 def go_to_main_menu() -> None:
@@ -218,6 +242,3 @@ def handle_no_items_found(item_name: str, items_func: Callable[[], Any],
             return go_to_main_menu()  # Go to the main menu
         else:
             print("Invalid option. Please select 1, 2, or 3.")
-
-
-

@@ -170,21 +170,21 @@ class Database(metaclass=AutoEnsureCursorMeta):
         """Rolls back to the SAVEPOINT (discards changes since the savepoint)."""
         self.cursor.execute("ROLLBACK TO SAVEPOINT temp_savepoint;")
 
-    def execute_query(self, query: str, params: tuple = (), column_index: int = 0) -> list:
+    def execute_query(self, query: str, params: tuple = ())-> list:
         """
         Executes a query and returns a list of values from a specific column (default is column 0).
 
         Args:
             query (str): The SQL query to execute.
             params (tuple): Parameters to bind to the query.
-            column_index (int): The index of the column to return values from (default is 0).
+            .
 
         Returns:
             list: A list of values from the specified column of the query result.
         """
         self.cursor.execute(query, params)
         result = self.cursor.fetchall()
-        return [row[column_index] for row in result]
+        return result
 
     def register_custom_function(self, func_name: str,
                                  num_args: int,

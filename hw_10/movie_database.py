@@ -18,7 +18,7 @@ Functions:
 - `search_movie_interactive`: Allows interactive movie search by title.
 - `insert_movie`: Adds a new movie to the database.
 - `insert_actor`: Adds a new actor and associates them with movies.
-- `show_movies_with_actors`: Displays movies with their actors in a paginated list.
+- `show_movies_with_actors_with_pagination`: Displays movies with their actors in a paginated list.
 - `get_unique_genres`: Retrieves a list of unique movie genres.
 - `show_genre`: Displays movie genres with pagination.
 - `show_movie_count_by_genre`: Displays the number of movies per genre.
@@ -74,6 +74,7 @@ def find_movies_by_keyword(db: DBClass, keyword: str) -> list[tuple[str, int]]:
 
     return [(movie[0], movie[1]) for movie in result] if result else []
 
+
 def find_actors_by_keyword(db: DBClass, keyword: str) -> list[tuple[str, int]]:
     """
     Searches for actors by keyword without user interaction.
@@ -95,6 +96,7 @@ def find_actors_by_keyword(db: DBClass, keyword: str) -> list[tuple[str, int]]:
 
     return list(set((actor[0], actor[1]) for actor in result)) if result else []
 
+
 def search_movie_interactive(db: DBClass) -> Optional[str]:
     """
     Prompts the user to search for a movie by a part of its title, using pagination.
@@ -105,7 +107,7 @@ def search_movie_interactive(db: DBClass) -> Optional[str]:
     Returns:
         Optional[str]: The title of the movie selected by the user, or None if no valid movie is found.
     """
-    movie_name = input("Enter the movie title to add:").strip()
+    movie_name = input("Enter the movie title to search:").strip()
     v = Validator()
     movie_name_sub = v.validate_title_movie(movie_name, "movie title")
     if not movie_name_sub[0]:
@@ -117,25 +119,24 @@ def search_movie_interactive(db: DBClass) -> Optional[str]:
 
     if not movies:
         return handle_no_items_found(
-                    item_name='movie',
-                    items_func=show_movies_with_actors(db),
-                    retry_func=search_movie_interactive(db)
-                )
+            item_name='movie',
+            items_func=show_movies_with_actors_with_pagination(db),
+            retry_func=search_movie_interactive(db)
+        )
 
     movies_list = [f"{movie[0]} ({movie[1]})" for movie in movies]
 
     while True:
         action = choose_page_action(
-            items = movies_list,
-            item_name = 'found movie'
+            items=movies_list,
+            item_name='found movie'
         )
 
         if action == "exit":
             return go_to_main_menu()
 
 
-
-def insert_movie(db: DBClass, movie_name: str|None = None, skip_check: bool = False) -> None:
+def insert_movie(db: DBClass, movie_name: str | None = None, skip_check: bool = False) -> None:
     """
     Inserts a new movie into the database, ensuring no duplicates.
 
@@ -199,15 +200,13 @@ def insert_movie(db: DBClass, movie_name: str|None = None, skip_check: bool = Fa
         item1='actor',
         item2='movie',
         item_id=movie_id,
-        func1 = lambda db, keyword: find_actors_by_keyword(db, keyword),
-        func2 = lambda: insert_actor(db, movie_name),
-        insert_func=lambda movie_cast:db.insert_movie_cast(movie_cast)
+        func1=lambda db, keyword: find_actors_by_keyword(db, keyword),
+        func2=lambda: insert_actor(db, movie_name),
+        insert_func=lambda movie_cast: db.insert_movie_cast(movie_cast)
     )
 
 
-
-
-def insert_actor(db: DBClass, movie_name: str|None = None) -> None:
+def insert_actor(db: DBClass, movie_name: str | None = None) -> None:
     """
     Inserts a new actor into the database and associates them with movies.
 
@@ -301,7 +300,7 @@ def show_movies_with_actors_with_pagination(db: DBClass, page: int = 1,
         print(f"Type 'next / +1' to go to the next page.")
     if page > 1:
         print(f"Type 'prev / -1' to go to the previous page.")
-    print("Type 'exit' to quit.")
+    print("Type 'exit' / 'q' to quit.")
 
     user_input = input("Your choice: ").strip().lower()
 
@@ -309,7 +308,7 @@ def show_movies_with_actors_with_pagination(db: DBClass, page: int = 1,
         show_movies_with_actors_with_pagination(db, page + 1, page_size)
     elif user_input in ['prev', '-1'] and page > 1:
         show_movies_with_actors_with_pagination(db, page - 1, page_size)
-    elif user_input == 'exit':
+    elif user_input in ['exit', 'q']:
         return go_to_main_menu()
     else:
         print("Invalid input. Please try again.")
@@ -334,7 +333,7 @@ def get_unique_genres(db: DBClass) -> list:
     return db.execute_query(query)
 
 
-def show_genres(db: DBClass) -> int | str | None:
+def show_genres(db: DBClass, selection: str = 'off') -> str | None:
     """
     Displays a list of all unique movie genres with pagination (15 genres per page)
     and allows the user to navigate through the pages.
@@ -343,25 +342,23 @@ def show_genres(db: DBClass) -> int | str | None:
         db: Database (sqlite3.Cursor): The db: Database object for executing SQL queries.
 
     Returns:
-        int | str | None:
-            - int if user selects a new page
+        str | None:
             - str if user selects a genre
             - None if the user exits
     """
-    genres_list = get_unique_genres(db)
-    if not genres_list:
-        print("No genres found.")
-        return None
+    genres_list = [genre[0] for genre in get_unique_genres(db)]
 
-    pagination = choose_page_action(
+    result = choose_page_action(
         current_page=1,
         items=genres_list,
         item_name="genre",
-        selection="off"
+        selection=selection
     )
 
-    if pagination == "exit":
+    if result in ['exit', 'q']:
         return go_to_main_menu()
+    else:
+        return result
 
 
 def show_movie_count_by_genre(db: DBClass) -> None:
@@ -371,23 +368,18 @@ def show_movie_count_by_genre(db: DBClass) -> None:
     Args:
         db: Database (sqlite3.Cursor): The db: Database object for executing SQL queries.
     """
-    genres = get_unique_genres(db)
-
-    if not genres:
-        print("No genres found.")
-        return
+    genres = [genre[0] for genre in get_unique_genres(db)]
 
     print("\nMovie count by genre:")
     for genre in genres:
         # Get the count of movies for each genre
-        cursor.execute("SELECT COUNT(*) FROM movies WHERE genre = ?", (genre,))
-        movie_count = cursor.fetchone()[0]
+        db.cursor.execute("SELECT COUNT(*) FROM movies WHERE genre = ?", (genre,))
+        movie_count = db.cursor.fetchone()[0]
 
         print(f"Genre: {genre} - {movie_count} movies")
     while True:
         input("\nType something to join the main menu.")
         return None
-
 
 
 def movie_age(release_year: int) -> int:
@@ -416,20 +408,19 @@ def show_movies_with_age(db: DBClass) -> None:
     Args:
         db: Database (sqlite3.Cursor): The db: Database object for executing SQL queries.
     """
-    cursor.execute("SELECT title, release_year, movie_age(release_year) FROM movies")
-    movies = cursor.fetchall()
-
-    if not movies:
-        print("No movies found.")
-        return
+    register_functions(db.connection)
+    db.cursor.execute("SELECT title, release_year, movie_age(release_year) FROM movies")
+    movies = db.cursor.fetchall()
 
     print("Movies and their age:")
-    for i, (movie_title, release_year) in enumerate(movies, 1):
-        age = movie_age(release_year)  # Calculate movie age
+    for i, (movie_title, release_year, age) in enumerate(movies, 1):
         print(f"{i}. Movie: \"{movie_title}\" — {age} years")
+    while True:
+        input("\nType something to join the main menu.")
+        return None
 
 
-def search_genre_by_part_name(db: DBClass) -> str | None:
+def search_genre_by_part_name(db: DBClass, selection: str = 'off') -> str | None:
     """
     Prompts the user to enter a part of a genre name and returns the genre that matches the search.
 
@@ -447,31 +438,30 @@ def search_genre_by_part_name(db: DBClass) -> str | None:
                            "(or 'exit'/'q' to return to the main menu): ").strip()
 
         if genre_part in ['exit', 'q']:
-            print("Returning to the main menu...")
-            return None
+            return go_to_main_menu()
 
-        db.register_custom_function('CI', 2, case_insensitive_collation)
+        db.connection.create_collation("CI", case_insensitive_collation)
         query = """
                     SELECT DISTINCT genre
                     FROM movies
                     WHERE genre LIKE ? COLLATE CI
                 """
-        # Fetch genres that match the entered part of the genre name
-        genres_list: list = db.execute_query(query, (f"%{genre_part}%",))
+        genres_list: list = [genre[0] for genre in db.execute_query(query, (f"%{genre_part}%",))]
 
         if genres_list:
-            choose_page_action(
+            result = choose_page_action(
                 current_page=1,
                 items=genres_list,
                 item_name="genre",
-                selection="off"
+                selection=selection
             )
-
-            return go_to_main_menu()
+            if result in ['exit', 'q']:
+                return go_to_main_menu()
+            else:
+                return result
 
         else:
             print("No genres found with that name.")
-            # Додаємо варіанти для наступних дій
             retry_choice = input(
                 "What would you like to do next? Choose an option:\n"
                 "1. Search again for a genre\n"
@@ -481,31 +471,33 @@ def search_genre_by_part_name(db: DBClass) -> str | None:
 
             if retry_choice == '1':
                 print("Let's try searching again...")
-                attempts = 0  # Скидаємо спроби і запускаємо пошук знову
+                return search_genre_by_part_name(db, selection)
             elif retry_choice == '2':
-                return str(show_genres(db))  # Показати всі жанри
+                if selection == 'off':
+                    return str(show_genres(db))
+                else:
+                    return str(show_genres(db, selection))
             elif retry_choice == '3' or retry_choice in ['exit', 'q']:
-                print("Returning to the main menu...")
-                return None
+                return go_to_main_menu()
             else:
                 print("Invalid choice, please try again.")
                 attempts += 1
 
     print("Too many invalid attempts. Exiting...")
-    return None
+    return go_to_main_menu()
 
 
-def average_birth_year_of_actors_in_genre(db: DBClass, genre: str) -> float | None:
+def average_birth_year_of_actors_in_genre(db: DBClass) -> float | None:
     """
     Displays the average birth year of actors in movies of a specific genre.
 
     Args:
         db: Database (sqlite3.Cursor): The db: Database object for executing SQL queries.
-        genre (str): The genre of the movies to filter by.
 
     Returns:
         float: The average birth year of actors.
     """
+    genre = search_genre_by_part_name(db, selection='on')
     query = """
         SELECT AVG(a.birth_year)
         FROM actors a
@@ -527,34 +519,27 @@ def fetch_actors_and_movies(db: DBClass, results_per_page: int = 10) -> None:
     Fetches and displays names of all actors and movie titles in a paginated format using UNION.
 
     Args:
-        db: Database (sqlite3.Cursor): The database db: Database to execute queries.
+        db (DBClass): The database object to execute queries.
         results_per_page (int): Number of results to show per page.
     """
-    cursor.execute("""
-            SELECT name AS result FROM actors
-            UNION
-            SELECT title AS result FROM movies
-            ORDER BY result;
-        """)
-
-    results = [row[0] for row in cursor.fetchall()]
-    total_results = len(results)
-    total_pages = (total_results + results_per_page - 1) // results_per_page
-    current_page = 1
-
-    while True:
-        action = choose_page_action(current_page, total_pages, results, "result", results_per_page)
-
-        if action == "exit":
-            break
-        if isinstance(action, int):
-            current_page = action
-        else:
-            print(f"You selected: {action}")
-            break
+    query = """
+        SELECT name AS result, birth_year AS year FROM actors
+        UNION
+        SELECT title AS result, release_year AS year FROM movies
+        ORDER BY year, result;
+    """
+    raw_results = db.execute_query(query)
+    results = [f"{row[0]} ({row[1]})" for row in raw_results]
+    choose_page_action(
+        current_page=1,
+        items=results,
+        item_name="actors and movie",
+        selection='off'
+    )
+    return go_to_main_menu()
 
 
-def add_reference(db: DBClass, item1: str, item2: str, item_id: int|None,
+def add_reference(db: DBClass, item1: str, item2: str, item_id: int | None,
                   func1: Callable[[DBClass, str], list],
                   func2: Callable[[], None],
                   insert_func: Callable[[Any], None]) -> None:
@@ -578,12 +563,10 @@ def add_reference(db: DBClass, item1: str, item2: str, item_id: int|None,
     if add_ref not in ["yes", "y", "1"]:
         return go_to_main_menu()
 
-    # Пошук першого елемента
     item_part = input(f"Please enter the part of the {item1} to search in database: ")
     search_results = func1(db, item_part)
 
     if search_results:
-        # Отримуємо ім'я елементів (назва фільму чи ім'я актора)
         search_item1 = [item[0] for item in search_results]
 
         if len(search_item1) > 1:
@@ -601,25 +584,22 @@ def add_reference(db: DBClass, item1: str, item2: str, item_id: int|None,
         add_new_item1 = input(
             f"There is no such {item1} in the database, would you like to add a {item1}? [yes, y, 1]: ").strip().lower()
         if add_new_item1 in ["yes", "y", "1"]:
-            func2()  # Додаємо новий запис
-            search_results = func1(db, item_part)  # Повторний пошук
+            func2()
+            search_results = func1(db, item_part)
             if not search_results:
                 print(f"Failed to add {item1}.")
                 return go_to_main_menu()
-            search_item1 = search_results[0]  # Беремо ID
+            search_item1 = search_results[0]
         else:
             print(f"{item1.capitalize()} was not added. {item2.capitalize()} remains unlinked.")
             return go_to_main_menu()
     get_id_func = getattr(DBClass, f"get_{item1}_id", None)
     if get_id_func:
-        # Викликаємо функцію з параметрами
         item1_id = get_id_func(search_item1)
 
         if item1_id:
-            # Створюємо список об'єктів MovieCast
             moviecast_list = [MovieCast(item1_id, item_id)]  # Додаємо до списку
 
-            # Викликаємо insert_func для додавання відношення
             insert_func(moviecast_list)
 
             print(f"Reference between {item1} and {item2} added successfully.")
@@ -659,7 +639,7 @@ def main():
             "8": search_genre_by_part_name,
             "9": average_birth_year_of_actors_in_genre,
             "10": fetch_actors_and_movies,
-            "0": lambda: sys.exit(1)  # Завершення роботи програми
+            "0": lambda: sys.exit(1)
         }
 
         while True:
@@ -672,12 +652,11 @@ def main():
             choice = input("Choose an option: ")
 
             if choice in options:
-                # Спеціальний випадок для опції "9"
                 if choice == "9":
-                    genre = search_genre_by_part_name(db)  # Отримуємо жанр
-                    options[choice](db, genre)  # Викликаємо функцію з жанром
+                    genre = search_genre_by_part_name(db)
+                    options[choice](db, genre)
                 else:
-                    options[choice](db)  # Для всіх інших викликаємо функцію з db
+                    options[choice](db)
             else:
                 print("Invalid choice. Try again.")
 
