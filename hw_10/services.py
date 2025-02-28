@@ -61,13 +61,11 @@ class Validator:
             print(f"Invalid validation type: {validation_type}")
             return False
 
-        try:
-            if re.match(pattern, text):
+        if re.match(pattern, text):
                 return True
-        except:
-            print(f"Invalid {item_name}! The {item_name} should consist of at least two letters "
+        print(f"Invalid {item_name}! The {item_name} should consist of at least two letters "
                   "at the beginning with a possible separator and at least two letters after it.")
-            return False
+        return False
 
     def validate_title_movie(self, text: str, item_name: str, max_attempts: int = 3) -> Tuple[bool, str]:
         """Validate movie title with a limited number of attempts."""
@@ -119,8 +117,8 @@ def choose_page_action(items: list, item_name: str, current_page: int = 1,
     Returns:
         str: The name of the selected item or 'exit' to return to the main menu.
     """
-    total_pages = (len(items) + results_per_page - 1) // results_per_page  # Обчислюємо кількість сторінок
-    attempts = 0  # Лічильник спроб
+    total_pages = (len(items) + results_per_page - 1) // results_per_page
+    attempts = 0
 
     while attempts < max_attempts:
         start_index = (current_page - 1) * results_per_page
@@ -147,7 +145,8 @@ def choose_page_action(items: list, item_name: str, current_page: int = 1,
         if action.isdigit():
             choice_index = int(action) - 1
             if 0 <= choice_index < len(page_items):
-                return page_items[choice_index][0]
+                print(page_items[choice_index])
+                return page_items[choice_index]
             print("Invalid selection. Please try again.")
         elif action in ['next', '+1']:
             if current_page < total_pages:
@@ -160,7 +159,7 @@ def choose_page_action(items: list, item_name: str, current_page: int = 1,
                 continue
             print("You are already on the first page.")
 
-        # Оновлення кількості спроб
+        print("\nInvalid input. Please try again.")
         attempts = update_attempts(attempts, max_attempts)
         if attempts >= max_attempts:
             return "exit"
@@ -181,8 +180,8 @@ def update_attempts(attempts: int, max_attempts: int) -> int:
     """
     attempts += 1
     if attempts >= max_attempts:
-        print("Maximum attempts reached. Returning to the main menu.")
-        return max_attempts  # Щоб вказати, що досягнуто ліміту
+        print("Maximum attempts reached.")
+        return max_attempts
     print(f"You have {max_attempts - attempts} attempts left.")
     return attempts
 
@@ -206,7 +205,6 @@ def case_insensitive_collation(str1, str2):
 
 
 def handle_no_items_found(item_name: str, items_func: Callable[[], Any],
-                          go_to_main_menu: Callable[[], None],
                           retry_func: Callable[[], None]) -> None:
     """
     Handles the case when no items are found and asks the user what to do next.
@@ -214,7 +212,6 @@ def handle_no_items_found(item_name: str, items_func: Callable[[], Any],
     Args:
         item_name (str): The name of the item (e.g., "movie", "actor").
         items_func (Callable[[], Any]): Function that returns all items (e.g., show_all_movies).
-        go_to_main_menu (Callable[[], None]): Function that goes to the main menu.
         retry_func (Callable[[], None]): Function to retry the search action.
 
     Returns:
@@ -224,7 +221,7 @@ def handle_no_items_found(item_name: str, items_func: Callable[[], Any],
 
     while True:
         retry_choice = input(
-            f"What would you like to do next? Choose an option:\n"
+            f"\nWhat would you like to do next? Choose an option:\n"
             f"1. Search again for a {item_name}\n"
             f"2. Show all {item_name}s\n"
             f"3. Exit to the main menu\n"
@@ -232,13 +229,13 @@ def handle_no_items_found(item_name: str, items_func: Callable[[], Any],
 
         if retry_choice == '1':
             print(f"Let's try searching again for the {item_name}...")
-            retry_func()  # Це викликає функцію для повторного пошуку
+            retry_func()
             return
         elif retry_choice == '2':
             print(f"Showing all {item_name}s...")
-            return items_func()  # Call the function that shows all {item_name}s (e.g., show_all_movies)
+            return items_func()
         elif retry_choice == '3' or retry_choice in ['exit', 'q']:
             print("Returning to the main menu...")
-            return go_to_main_menu()  # Go to the main menu
+            return go_to_main_menu()
         else:
             print("Invalid option. Please select 1, 2, or 3.")

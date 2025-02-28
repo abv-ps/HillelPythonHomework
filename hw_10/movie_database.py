@@ -120,8 +120,8 @@ def search_movie_interactive(db: DBClass) -> Optional[str]:
     if not movies:
         return handle_no_items_found(
             item_name='movie',
-            items_func=show_movies_with_actors_with_pagination(db),
-            retry_func=search_movie_interactive(db)
+            items_func=lambda: show_movies_with_actors_with_pagination(db),  # Передаємо функцію без виклику
+            retry_func=lambda: search_movie_interactive(db)
         )
 
     movies_list = [f"{movie[0]} ({movie[1]})" for movie in movies]
@@ -311,7 +311,7 @@ def show_movies_with_actors_with_pagination(db: DBClass, page: int = 1,
     elif user_input in ['exit', 'q']:
         return go_to_main_menu()
     else:
-        print("Invalid input. Please try again.")
+        print("\nInvalid input. Please try again.")
         show_movies_with_actors_with_pagination(db, page, page_size)
 
 
@@ -505,13 +505,16 @@ def average_birth_year_of_actors_in_genre(db: DBClass) -> float | None:
         JOIN movies m ON mc.movie_id = m.id
         WHERE m.genre = ?
     """
-    average_birth_year = db.execute_query(query, (genre,))[0]
+    result = db.execute_query(query, (genre,))
+    average_birth_year = result[0][0] if result and result[0][0] is not None else None
 
     if not average_birth_year:
         print(f"No actors found for genre: {genre}")
         return None
     print(f"Average birth year of actors in movies of genre '{genre}' is {average_birth_year:.0f}")
-    return average_birth_year
+    while True:
+        input("\nType something to join the main menu.")
+        return None
 
 
 def fetch_actors_and_movies(db: DBClass, results_per_page: int = 10) -> None:
@@ -523,19 +526,22 @@ def fetch_actors_and_movies(db: DBClass, results_per_page: int = 10) -> None:
         results_per_page (int): Number of results to show per page.
     """
     query = """
-        SELECT name AS result, birth_year AS year FROM actors
+        SELECT name AS result, birth_year AS year, 'Actor' AS type FROM actors
         UNION
-        SELECT title AS result, release_year AS year FROM movies
-        ORDER BY year, result;
+        SELECT title AS result, release_year AS year, 'Film' AS type FROM movies
+        ORDER BY type, result, year;
     """
     raw_results = db.execute_query(query)
-    results = [f"{row[0]} ({row[1]})" for row in raw_results]
+
+    results = [f"{row[2]}: {row[0]} ({row[1]})" for row in raw_results]
+
     choose_page_action(
         current_page=1,
         items=results,
-        item_name="actors and movie",
+        item_name="actors and movies",
         selection='off'
     )
+
     return go_to_main_menu()
 
 
@@ -653,8 +659,8 @@ def main():
 
             if choice in options:
                 if choice == "9":
-                    genre = search_genre_by_part_name(db)
-                    options[choice](db, genre)
+                    #genre = search_genre_by_part_name(db)
+                    options[choice](db)
                 else:
                     options[choice](db)
             else:
