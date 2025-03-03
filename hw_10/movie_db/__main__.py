@@ -3,10 +3,9 @@ This is the main module for interacting with the "Kinodb database".
 To interact with the database, run this file.
 
 Usage:
-    python main.py
+    python -m movie_db.__main__
 """
-from hw_10.ui.movie_database import main
+from .ui.movie_database import main
 
 if __name__ == "__main__":
     main()
-   

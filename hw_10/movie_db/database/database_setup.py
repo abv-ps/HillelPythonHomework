@@ -3,20 +3,20 @@ This module handles the setup and initialization of an SQLite database for stori
 including movies, actors, and their relationships.
 
 Functions:
-- create_tables(cursor: sqlite3.Cursor) -> None: Creates the necessary tables in the database for storing
-  movie, actor, and movie-actor relationship data.
-- insert_movies(cursor: sqlite3.Cursor, movies: list[Movie]) -> None: Inserts a list of Movie objects
-  into the database.
-- insert_actors(cursor: sqlite3.Cursor, actors: list[Actor]) -> None: Inserts a list of Actor objects
-  into the database.
-- get_movie_id(cursor: sqlite3.Cursor, title: str) -> Optional[int]: Retrieves the ID of a movie by its title from
-  the database.
-- get_actor_id(cursor: sqlite3.Cursor, name: str) -> Optional[int]: Retrieves the ID of an actor by their name from
-  the database.
-- insert_movie_cast(cursor: sqlite3.Cursor, movie_cast: list[MovieCast]) -> None: Inserts a list of
-  MovieCast objects into the database, establishing relationships between movies and actors.
-- load_csv(filename: str) -> list[list[str]]: Loads data from a CSV file and returns it as a list of rows, excluding
-  the header.
+- create_tables(cursor: sqlite3.Cursor) -> None: Creates the necessary tables in the database
+  for storing movie, actor, and movie-actor relationship data.
+- insert_movies(cursor: sqlite3.Cursor, movies: list[Movie]) -> None: Inserts a list
+  of Movie objects into the database.
+- insert_actors(cursor: sqlite3.Cursor, actors: list[Actor]) -> None: Inserts a list
+  of Actor objects into the database.
+- get_movie_id(cursor: sqlite3.Cursor, title: str) -> Optional[int]: Retrieves the ID
+  of a movie by its title from the database.
+- get_actor_id(cursor: sqlite3.Cursor, name: str) -> Optional[int]: Retrieves the ID
+  of an actor by their name from the database.
+- insert_movie_cast(cursor: sqlite3.Cursor, movie_cast: list[MovieCast]) -> None: Inserts a list
+  of MovieCast objects into the database, establishing relationships between movies and actors.
+- load_csv(filename: str) -> list[list[str]]: Loads data from a CSV file and returns it as a list
+  of rows, excluding the header.
 
 This module is designed to be run as a standalone script that will:
 1. Initialize the database class, which automatically connects to the SQLite database.
@@ -24,10 +24,14 @@ This module is designed to be run as a standalone script that will:
 3. Load data from CSV files (movies, actors, and movie-actor relationships).
 4. Insert the loaded data into the database.
 5. Commit changes and close the connection to the database.
-"""
 
+Usage:
+    python -m movie_db.database.database_setup
+"""
+import os
 import sqlite3
 from typing import Optional, Callable, Any
+
 from .db_models import Actor, Movie, MovieCast, DatabaseHandler
 from ..services.services import AutoEnsureCursorMeta
 from ..utils.helpers import load_csv
@@ -38,10 +42,10 @@ class Database(metaclass=AutoEnsureCursorMeta):
     A class that manages the connection to an SQLite database and provides methods
     for creating tables, inserting data, and managing transactions.
 
-    This class provides a context manager for handling database connections and transactions, as well as methods
-    for interacting with the database, including creating tables, inserting data, executing queries, and using
-    savepoints for transaction management. It also allows the registration of custom functions for use within
-    SQL queries.
+    This class provides a context manager for handling database connections and transactions,
+    as well as methods for interacting with the database, including creating tables, inserting data,
+    executing queries, and using savepoints for transaction management. It also allows
+    the registration of custom functions for use within SQL queries.
 
     Attributes:
         db_path (str): Path to the SQLite database file.
@@ -53,7 +57,8 @@ class Database(metaclass=AutoEnsureCursorMeta):
             the cursor.
         __enter__: Prepares the database connection for use in a context manager.
         __exit__: Commits changes or rolls back transactions and closes the database connection.
-        create_tables: Creates tables for movies, actors, and their relationships if they do not exist.
+        create_tables: Creates tables for movies, actors, and their relationships
+        if they do not exist.
         insert_movies: Inserts a list of `Movie` objects into the database.
         insert_actors: Inserts a list of `Actor` objects into the database.
         insert_movie_cast: Inserts movie-actor relationships into the database.
@@ -70,7 +75,7 @@ class Database(metaclass=AutoEnsureCursorMeta):
         ValueError: If there is an issue with the cursor during database operations.
     """
 
-    def __init__(self, db_path: str):
+    def __init__(self, db_path: str) -> None:
         """
         Initializes the database connection.
 
@@ -89,11 +94,11 @@ class Database(metaclass=AutoEnsureCursorMeta):
         except sqlite3.Error as e:
             print(f"Unexpected SQLite error: {e}")
 
-    def __enter__(self):
+    def __enter__(self) -> 'Database':
         """Enables using the class in a context manager."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Commits changes and closes the connection after the context block."""
         if self.connection:
             try:
@@ -109,13 +114,14 @@ class Database(metaclass=AutoEnsureCursorMeta):
                 if self.cursor:
                     self.cursor.close()
                 self.connection.close()
-                print("database connection closed.")
+                print("Database connection closed.")
 
     def create_tables(self) -> None:
         """
         Creates tables for movies, actors, and their relationships if they do not exist.
 
-        This method checks for the existence of tables in the database and creates them if they are missing.
+        This method checks for the existence of tables in the database and creates them
+        if they are missing.
         The tables include:
         - `movies`: Stores movie details such as title, release year, and genre.
         - `actors`: Stores actor details like name and birth year.
@@ -201,7 +207,8 @@ class Database(metaclass=AutoEnsureCursorMeta):
         result = self.cursor.fetchall()
         return result
 
-    def register_custom_function(self, func_name: str, num_args: int, func: Callable[..., Any]) -> None:
+    def register_custom_function(self, func_name: str, num_args: int,
+                                 func: Callable[..., Any]) -> None:
         """
         Registers a custom function for use in SQL queries.
 
@@ -218,18 +225,21 @@ class Database(metaclass=AutoEnsureCursorMeta):
 
 
 if __name__ == '__main__':
-    with Database('kinodb.db') as db:
+    db_folder = os.path.join(os.path.dirname(__file__), '..', 'database', 'kinodb.db')
+    with Database(db_folder) as db:
         print("Starting to create tables.")
         db.create_tables()
 
         db.cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
         tables = db.cursor.fetchall()
-
+        print(f"Current working directory: {os.getcwd()}")
         for table in tables:
             print(f"The table {table[0]} was created")
+            print(f"Current working directory: {os.getcwd()}")
 
-        movies_data = load_csv('../movies.csv')
-        actors_data = load_csv('../actors.csv')
+        movies_data = load_csv('movies.csv')
+        print(f"Current working directory: {os.getcwd()}")
+        actors_data = load_csv('actors.csv')
 
         movies_list = [Movie(row[0], int(row[1]), row[2]) for row in movies_data]
         actors_list = [Actor(row[1], int(row[2])) for row in actors_data]

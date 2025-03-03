@@ -137,7 +137,7 @@ def handle_no_items_found(item_name: str, items_func: Callable[[], Any],
             return items_func()
         elif retry_choice == '3' or retry_choice in ['exit', 'q']:
             print("Returning to the main menu...")
-            from ..ui.movie_database import go_to_main_menu
+            from hw_10.movie_db.ui.movie_database import go_to_main_menu
             return go_to_main_menu()
         else:
             print("Invalid option. Please select 1, 2, or 3.")

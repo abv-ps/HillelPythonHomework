@@ -34,12 +34,12 @@ The program provides an interactive interface to manage a movie database. Users 
 such as adding new movies or actors, searching for movies and actors, and viewing detailed analytical information.
 Pagination support allows users to easily navigate through large datasets of movies, actors, and genres.
 """
-
+import os
 import sys
 from typing import Callable, Any
 
 from ..database.database_setup import Database as DBClass
-from ..database.db_models import MovieCast
+from ..database.db_models import MovieCast, DatabaseHandler as DBHandler
 from ..utils.helpers import choose_page_action
 from ..services.actor_service import ActorService
 from ..services.movie_service import MovieService
@@ -59,6 +59,7 @@ def average_birth_year_of_actors_in_genre(db: DBClass) -> float | None:
             - None if no actors are found for the specified genre.
     """
     genre = GenreService.search_genre_by_part_name(db, selection='on')
+    print(f"{genre} is your genre.")
     query = """
         SELECT AVG(a.birth_year)
         FROM actors a
@@ -120,7 +121,6 @@ def add_reference(
         item2: str,
         item_id: int | None,
         func1: Callable[[DBClass, str], list[tuple[str, int]]],
-        func2: Callable[[], None],
         insert_func: Callable[[Any], None]
 ) -> None:
     """
@@ -136,7 +136,6 @@ def add_reference(
         item2 (str): The name of the second item to add reference (e.g., "movie").
         item_id (int | None): The ID of the second item (e.g., movie ID) that will be referenced.
         func1 (Callable[[DBClass, str], list[tuple[str, int]]]): Function to search for the first item in the database.
-        func2 (Callable[[], None]): Function to add a new item if it does not exist in the database.
         insert_func (Callable[[Any], None]): Function to insert the reference between the two items.
 
     Returns:
@@ -148,7 +147,7 @@ def add_reference(
     if add_ref not in ["yes", "y", "1"]:
         return go_to_main_menu()
 
-    item_part = input(f"Please enter the part of the {item1} to search in database: ")
+    item_part = input(f"Please enter the {item1} to search in database: ")
     search_results = func1(db, item_part)
 
     if search_results:
@@ -169,7 +168,12 @@ def add_reference(
         add_new_item1 = input(
             f"There is no such {item1} in the database, would you like to add a {item1}? [yes, y, 1]: ").strip().lower()
         if add_new_item1 in ["yes", "y", "1"]:
-            func2()
+            if item1 == "actor":
+                # Find the movie title from it's name
+                item1_name = DBHandler.get_name_by_id(db.connection, item2, item_id)
+                ActorService.insert_actor(db=db, movie_title=item1_name, actor_name=item_part)
+            else:
+                MovieService.insert_movie(db=db, movie_title=item_part, skip_check=True)
             search_results = func1(db, item_part)
             if not search_results:
                 print(f"Failed to add {item1}.")
@@ -201,6 +205,20 @@ def go_to_main_menu() -> None:
     return None
 
 
+def exit_program() -> None:
+    """
+    Prints a message indicating the program is finishing and exits the program.
+
+    This function is typically used to terminate the program, displaying a
+    farewell message to the user before calling sys.exit(0) to end the process.
+
+    Returns:
+        None: This function does not return any value. It exits the program.
+    """
+    print("Finishing work with database... Thank you, have a nice to meet!")
+    sys.exit(0)
+
+
 def main():
     """
     Main function for managing the movie database application.
@@ -221,7 +239,10 @@ def main():
     The user can choose an action by inputting a corresponding number.
     The program will continue until the user chooses the "Exit" option (option 0).
     """
-    with DBClass('../database/kinodb.db') as db:
+    # db_path = os.path.join(os.path.dirname(__file__), '..', '..', 'database', 'kinodb.db')
+    # db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'database', 'kinodb.db')
+    db_path = r"C:\Users\Bogdan\PycharmProjects\HillelPythonHomework\hw_10\movie_db\database\kinodb.db"
+    with DBClass(db_path) as db:
         options = {
             "1": MovieService.insert_movie,
             "2": ActorService.insert_actor,
@@ -233,7 +254,7 @@ def main():
             "8": GenreService.search_genre_by_part_name,
             "9": average_birth_year_of_actors_in_genre,
             "10": fetch_actors_and_movies,
-            "0": lambda: sys.exit(1)
+            "0": exit_program
         }
 
         while True:
@@ -246,18 +267,12 @@ def main():
             choice = input("Choose an option: ")
 
             if choice in options:
-                if choice == "9":
-                    # genre = search_genre_by_part_name(db)
+                if choice != "0":
                     options[choice](db)
                 else:
-                    options[choice](db)
+                    options[choice]()
             else:
                 print("Invalid choice. Try again.")
-
-            if choice == "0":
-                print("Finishing work with database..."
-                      "Thank you, have a nice to meet!")
-                sys.exit(1)
 
 
 if __name__ == "__main__":

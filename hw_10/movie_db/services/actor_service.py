@@ -42,27 +42,30 @@ class ActorService:
         return list(set((actor[0], actor[1]) for actor in result)) if result else []
 
     @staticmethod
-    def insert_actor(db: DBClass, movie_name: Optional[str] = None) -> None:
+    def insert_actor(db: DBClass,
+                     actor_name: Optional[str] = None,
+                     movie_title: Optional[str] = None) -> None:
         """
         Inserts a new actor into the database and associates them with movies.
 
         Args:
             db (DBClass): The SQLite database class used for database interactions.
-            movie_name (Optional[str]): The name of the movie to associate the actor with (optional).
+            movie_title (Optional[str]): The name of the movie to associate the actor with (optional).
                 If no movie is provided, the actor will be added without association.
 
         Returns:
             None: This function does not return a value. It interacts directly with the database.
         """
-        actor_name = input("Enter the actor's name: ")
-        v = Validator()
-        actor_name_sub = v.validate_actor_name_genre(actor_name, "actor's name")
+        from ..ui.movie_database import go_to_main_menu
+        if not actor_name:
+            actor_name = input("Enter the actor's name: ")
+            v = Validator()
+            actor_name_sub = v.validate_actor_name_genre(actor_name, "actor's name")
 
-        if not actor_name_sub[0]:
-            from ..ui.movie_database import go_to_main_menu
-            return go_to_main_menu()
+            if not actor_name_sub[0]:
+                return go_to_main_menu()
 
-        actor_name = actor_name_sub[1]
+            actor_name = actor_name_sub[1]
         existing_actor = db.get_actor_id(actor_name)
 
         if not existing_actor:
@@ -76,7 +79,7 @@ class ActorService:
                     print("Invalid birth year. Please enter a valid number.")
             else:
                 print("Too many invalid attempts. Exiting...")
-                return
+                return go_to_main_menu()
 
             db.start_savepoint()
             db.insert_actors([Actor(actor_name, birth_year)])
@@ -87,12 +90,12 @@ class ActorService:
             actor_id = existing_actor
         from .movie_service import MovieService
         from ..ui.movie_database import add_reference
-        add_reference(
-            db=db,
-            item1='movie',
-            item2='actor',
-            item_id=actor_id,
-            func1=lambda db, keyword: MovieService.find_movies_by_keyword(db, keyword),
-            func2=lambda: MovieService.insert_movie(db, movie_name),
-            insert_func=lambda movie_cast: db.insert_movie_cast(movie_cast)
-        )
+        if not movie_title:
+            add_reference(
+                db=db,
+                item1='movie',
+                item2='actor',
+                item_id=actor_id,
+                func1=MovieService.find_movies_by_keyword,
+                insert_func=db.insert_movie_cast
+            )

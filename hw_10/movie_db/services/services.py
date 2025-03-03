@@ -2,7 +2,8 @@
 This module provides functionality for ensuring database cursor availability in class methods.
 
 Key Components:
-- `ensure_cursor`: A decorator that ensures a database cursor is available before executing a method.
+- `ensure_cursor`: A decorator that ensures a database cursor is available
+  before executing a method.
   If the cursor is unavailable, a `ValueError` is raised.
 - `AutoEnsureCursorMeta`: A metaclass that automatically applies the `ensure_cursor` decorator to
   all methods of a class, except for special methods like `__init__`, `__enter__`, and `__exit__`.

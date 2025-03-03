@@ -70,6 +70,7 @@ class GenreService:
         Returns:
             Optional[str]: The selected genre name or None if no valid genre is found.
         """
+        print(f"Selection is {selection}")
         genre_part = input(
             "Enter part of the genre name to search for (or 'exit'/'q' to return to the main menu): ").strip()
         if genre_part in ['exit', 'q']:
@@ -91,7 +92,8 @@ class GenreService:
                 item_name="genre",
                 selection=selection
             )
-            return None if result in ['exit', 'q'] else result
+            print(f"You select the {result}")
+            return result #None if result in ['exit', 'q'] else
 
         handle_no_items_found(
             item_name="genre",
