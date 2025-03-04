@@ -102,7 +102,7 @@ class Database(metaclass=AutoEnsureCursorMeta):
         """Commits changes and closes the connection after the context block."""
         if self.connection:
             try:
-                if exc_type is None:
+                if exc_type is None or SystemExit:
                     self.connection.commit()
                     print("Changes committed successfully.")
                 else:
@@ -235,7 +235,6 @@ if __name__ == '__main__':
         print(f"Current working directory: {os.getcwd()}")
         for table in tables:
             print(f"The table {table[0]} was created")
-            print(f"Current working directory: {os.getcwd()}")
 
         movies_data = load_csv('movies.csv')
         print(f"Current working directory: {os.getcwd()}")

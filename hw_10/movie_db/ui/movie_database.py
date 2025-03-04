@@ -59,7 +59,6 @@ def average_birth_year_of_actors_in_genre(db: DBClass) -> float | None:
             - None if no actors are found for the specified genre.
     """
     genre = GenreService.search_genre_by_part_name(db, selection='on')
-    print(f"{genre} is your genre.")
     query = """
         SELECT AVG(a.birth_year)
         FROM actors a
@@ -71,13 +70,10 @@ def average_birth_year_of_actors_in_genre(db: DBClass) -> float | None:
     average_birth_year = result[0][0] if result and result[0][0] is not None else None
 
     if not average_birth_year:
-        print(f"No actors found for genre: {genre}")
-        return None
+        return go_to_main_menu(f"No actors found for genre: {genre}")
 
-    print(f"Average birth year of actors in movies of genre '{genre}' is {average_birth_year:.0f}")
-    while True:
-        input("\nType something to join the main menu.")
-        return None
+    return go_to_main_menu(f"Average birth year of actors in movies of genre "
+                           f"'{genre}' is {average_birth_year:.0f}")
 
 
 def fetch_actors_and_movies(db: DBClass) -> None:
@@ -111,7 +107,6 @@ def fetch_actors_and_movies(db: DBClass) -> None:
         item_name="actors and movies",
         selection='off'
     )
-
     return go_to_main_menu()
 
 
@@ -121,7 +116,6 @@ def add_reference(
         item2: str,
         item_id: int | None,
         func1: Callable[[DBClass, str], list[tuple[str, int]]],
-        insert_func: Callable[[Any], None]
 ) -> None:
     """
     Prompts the user to add a reference between two items in the database.
@@ -136,7 +130,6 @@ def add_reference(
         item2 (str): The name of the second item to add reference (e.g., "movie").
         item_id (int | None): The ID of the second item (e.g., movie ID) that will be referenced.
         func1 (Callable[[DBClass, str], list[tuple[str, int]]]): Function to search for the first item in the database.
-        insert_func (Callable[[Any], None]): Function to insert the reference between the two items.
 
     Returns:
         None: The function does not return any value, but prompts the user and inserts a reference into the database.
@@ -145,11 +138,11 @@ def add_reference(
                     f"[yes, y, 1] or go back to the main menu [no, n]: ").strip().lower()
 
     if add_ref not in ["yes", "y", "1"]:
-        return go_to_main_menu()
+        return go_to_main_menu("According to your choice 'exit'")
 
     item_part = input(f"Please enter the {item1} to search in database: ")
     search_results = func1(db, item_part)
-
+    print(f"{item2} (id is {item_id})")
     if search_results:
         search_item1 = [item[0] for item in search_results]
 
@@ -160,7 +153,7 @@ def add_reference(
                 selection='on'
             )
             if selection == "exit":
-                return go_to_main_menu()
+                return go_to_main_menu("According to your choice 'exit'")
             search_item1 = selection
         else:
             search_item1 = search_item1[0]
@@ -168,16 +161,14 @@ def add_reference(
         add_new_item1 = input(
             f"There is no such {item1} in the database, would you like to add a {item1}? [yes, y, 1]: ").strip().lower()
         if add_new_item1 in ["yes", "y", "1"]:
+            item2_name = DBHandler.get_name_by_id(db.connection, item2, item_id)
             if item1 == "actor":
-                # Find the movie title from it's name
-                item1_name = DBHandler.get_name_by_id(db.connection, item2, item_id)
-                ActorService.insert_actor(db=db, movie_title=item1_name, actor_name=item_part)
+                ActorService.insert_actor(db=db, movie_title=item2_name, actor_name=item_part)
             else:
                 MovieService.insert_movie(db=db, movie_title=item_part, skip_check=True)
             search_results = func1(db, item_part)
             if not search_results:
-                print(f"Failed to add {item1}.")
-                return go_to_main_menu()
+                return go_to_main_menu(f"Failed to add {item1}.")
             search_item1 = search_results[0]
         else:
             print(f"{item1.capitalize()} was not added. {item2.capitalize()} remains unlinked.")
@@ -185,22 +176,33 @@ def add_reference(
 
     get_id_func = getattr(DBClass, f"get_{item1}_id", None)
     if get_id_func:
-        item1_id = get_id_func(search_item1)
-
+        item1_id = get_id_func(db, search_item1)
         if item1_id:
-            moviecast_list = [MovieCast(item1_id, item_id)]  # Add to list
-
-            insert_func(moviecast_list)
-
-            print(f"Reference between {item1} and {item2} added successfully.")
-
+            moviecast_list = [MovieCast(item1_id, item_id)]
+            db.start_savepoint()
+            db.insert_movie_cast(moviecast_list)
+            db.release_savepoint()
+            print(f"Reference between {item1} {search_item1} and {item2} "
+                  f"{DBHandler.get_name_by_id(db.connection, item2, item_id)} "
+                  f"added successfully.")
     return go_to_main_menu()
 
 
-def go_to_main_menu() -> None:
+def go_to_main_menu(prompt_message: str = None) -> None:
     """
-    Prompts the user to return to the main menu.
+    Prompts the user to return to the main menu and handles the user input.
+
+    Args:
+        prompt_message (str, optional): The message that will be shown to the user.
+                                         If not provided, no prompt will be displayed.
     """
+    if prompt_message and prompt_message != "According to your choice 'exit'":
+        user_input = input(f"{prompt_message}\nType something and press Enter to join the main menu: ")
+    elif not prompt_message:
+        user_input = input("Type something and press Enter to join the main menu: ")
+    else:
+        print(prompt_message)
+
     print("Returning to the main menu...")
     return None
 

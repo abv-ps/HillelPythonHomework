@@ -181,6 +181,7 @@ class DatabaseHandler(Generic[T]):
         values = [tuple(getattr(item, col) for col in columns) for item in data]
         cursor.executemany(query, values)
 
+
     @staticmethod
     def get_id(connection: sqlite3.Connection, model: Type[T],
                identifier_value: Any) -> Optional[int]:
@@ -237,11 +238,9 @@ class DatabaseHandler(Generic[T]):
         # Отримуємо дані з моделі
         table_name = model.TABLE_NAME
         identifier_column = model.IDENTIFIER_COLUMN
-
         query = f"SELECT {identifier_column} FROM {table_name} WHERE id = ?"
         cursor.execute(query, (item_id,))
         result = cursor.fetchone()
-
         return result[0] if result else None
 
     @staticmethod

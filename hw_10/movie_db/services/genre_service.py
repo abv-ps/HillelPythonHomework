@@ -70,12 +70,11 @@ class GenreService:
         Returns:
             Optional[str]: The selected genre name or None if no valid genre is found.
         """
-        print(f"Selection is {selection}")
         genre_part = input(
             "Enter part of the genre name to search for (or 'exit'/'q' to return to the main menu): ").strip()
         if genre_part in ['exit', 'q']:
             from ..ui.movie_database import go_to_main_menu
-            return go_to_main_menu()
+            return go_to_main_menu("According to your choice 'exit'")
 
         db.connection.create_collation("CI", DBHandler.case_insensitive_collation)
         query = """
@@ -93,11 +92,12 @@ class GenreService:
                 selection=selection
             )
             print(f"You select the {result}")
-            return result #None if result in ['exit', 'q'] else
+            from ..ui.movie_database import go_to_main_menu
+            return go_to_main_menu("According to your choice 'exit'") if result in ['exit', 'q'] else result
 
-        handle_no_items_found(
+        return handle_no_items_found(
             item_name="genre",
             items_func=lambda: GenreService.show_genres(db, selection),
             retry_func=lambda: GenreService.search_genre_by_part_name(db, selection)
         )
-        return None
+

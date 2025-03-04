@@ -70,7 +70,7 @@ class MovieService:
         v = Validator()
         movie_name_sub = v.validate_title_movie(movie_name, "movie title")
         if not movie_name_sub[0]:
-            return go_to_main_menu()
+            return go_to_main_menu("Movie title is empty")
         movie_name = movie_name_sub[1]
 
         movies = MovieService.find_movies_by_keyword(db, movie_name)
@@ -91,7 +91,7 @@ class MovieService:
             )
 
             if action == "exit":
-                return go_to_main_menu()
+                return go_to_main_menu("According to your choice 'exit'")
 
     @staticmethod
     def insert_movie(db: DBClass, movie_title: Optional[str] = None,
@@ -102,7 +102,7 @@ class MovieService:
         Args:
             db (DBClass): The SQLite database class or cursor object used for executing SQL queries.
             movie_title (Optional[str]): The movie title to add. If not provided,
-                                        user will be asked to enter it.
+                                         user will be asked to enter it.
             skip_check (bool): Whether to skip the duplicate check. Default is False.
 
         Returns:
@@ -110,12 +110,13 @@ class MovieService:
                   and prints status messages.
         """
         from ..ui.movie_database import go_to_main_menu
+
         if not movie_title:
             movie_title = input("Please enter the movie title to add: ")
             v = Validator()
             movie_name_sub = v.validate_title_movie(movie_title, "movie title")
             if not movie_name_sub[0]:
-                return go_to_main_menu()
+                return go_to_main_menu("Movie title is empty")
             movie_title = movie_name_sub[1]
 
         if not skip_check:
@@ -128,26 +129,22 @@ class MovieService:
                 if user_choice in ["yes", "y", "1"]:
                     MovieService.insert_movie(db)
                 else:
-                    return go_to_main_menu()
+                    return go_to_main_menu("Movie title is empty")
 
-        for _ in range(3):
-            try:
-                release_year = int(input("To add the movie to the database, "
-                                         "please enter its release year: "))
-                if 1900 <= release_year <= 2100:
-                    break
-                print("Please enter a valid year between 1900 and 2100.")
-            except ValueError:
-                print("Invalid release year. Please enter a valid number.")
-        else:
-            print("Maximum attempts reached. Invalid input.")
-            return go_to_main_menu()
+        v = Validator()
+        is_valid, release_year = v.validate_year(
+            year=int(input("To add the movie to the database, please enter its release year: ")),
+            year_type="release"
+        )
 
-        genre = input("Enter the movie genre: ")
+        if not is_valid:
+            return go_to_main_menu("Maximum attempts reached. Invalid input.")
+
+        genre = input("Enter the movie genre: ").strip()
         if not genre:
-            genre = input("Genre is not entered. Please enter the movie genre:")
+            genre = input("Genre is not entered. Please enter the movie genre: ").strip()
+
         if genre:
-            v = Validator()
             genre_sub = v.validate_actor_name_genre(genre, "genre")
             if not genre_sub[0]:
                 print(f"The genre {genre_sub[1]} does not meet the requirements, "
@@ -155,20 +152,22 @@ class MovieService:
                 genre = ''
             else:
                 genre = genre_sub[1]
+
         db.start_savepoint()
         db.insert_movies([Movie(movie_title, release_year, genre)])
-        movie_id = db.cursor.lastrowid
         db.release_savepoint()
-        print(f"Movie '{movie_title}' added.")
+        movie_id = db.cursor.lastrowid
+        print(f"Movie '{movie_title}' with id {movie_id} added.")
+
         from .actor_service import ActorService
         from ..ui.movie_database import add_reference
-        add_reference(
+
+        return add_reference(
             db=db,
             item1='actor',
             item2='movie',
             item_id=movie_id,
-            func1=ActorService.find_actors_by_keyword,
-            insert_func=db.insert_movie_cast
+            func1=ActorService.find_actors_by_keyword
         )
 
     @staticmethod
@@ -210,8 +209,7 @@ class MovieService:
         total_pages = (total_movies + page_size - 1) // page_size
 
         if not movies_actors:
-            print("No movies found on this page.")
-            return go_to_main_menu()
+            return go_to_main_menu("No movies found on this page.")
 
         max_title_length = max(len(movie[0]) for movie in movies_actors)
 
@@ -236,7 +234,7 @@ class MovieService:
         elif user_input in ['prev', '-1'] and page > 1:
             MovieService.show_movies_with_actors_with_pagination(db, page - 1, page_size)
         elif user_input in ['exit', 'q']:
-            return go_to_main_menu()
+            return go_to_main_menu("According to your choice 'exit')")
         else:
             print("\nInvalid input. Please try again.")
             MovieService.show_movies_with_actors_with_pagination(db, page, page_size)
@@ -255,6 +253,7 @@ class MovieService:
                   movies by genre to the console.
         """
         from .genre_service import GenreService
+        from ..ui.movie_database import go_to_main_menu
         genres = GenreService.get_unique_genres(db)
 
         print("\nMovie count by genre:")
@@ -262,10 +261,8 @@ class MovieService:
             db.cursor.execute("SELECT COUNT(*) FROM movies WHERE genre = ?", (genre,))
             movie_count = db.cursor.fetchone()[0]
 
-            print(f"Genre: {genre} - {movie_count} movies")
-        while True:
-            input("\nType something to join the main menu.")
-            return None
+            print(f"Genre: {genre} - {movie_count} {'movie' if movie_count == 1 else 'movies'}")
+        return go_to_main_menu()
 
     @staticmethod
     def movie_age(release_year: int) -> int:
@@ -295,7 +292,7 @@ class MovieService:
                 - This function does not return anything. It prints the movie titles
                   and their respective ages to the console.
         """
-
+        from ..ui.movie_database import go_to_main_menu
         DBClass.register_custom_function(
             db,
             func_name="movie_age",
@@ -306,8 +303,6 @@ class MovieService:
         movies = db.cursor.fetchall()
 
         print("Movies and their age:")
-        for i, (movie_title, age) in enumerate(movies, 1):
-            print(f"{i}. Movie: \"{movie_title}\" — {age} years")
-        while True:
-            input("\nType something to join the main menu.")
-            return None
+        for i, (movie_title, year, age) in enumerate(movies, 1):
+            print(f"{i}. Movie: \"{movie_title}\" ({year}) — {age} {'year' if age == 1 else 'years'}")
+        return go_to_main_menu()

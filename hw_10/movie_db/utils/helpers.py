@@ -17,7 +17,7 @@ Usage:
 """
 
 import csv
-from typing import Callable, Any
+from typing import Callable, Any, Optional
 
 
 def load_csv(filename: str) -> list[list[str]]:
@@ -106,7 +106,7 @@ def choose_page_action(items: list, item_name: str, current_page: int = 1,
 
 
 def handle_no_items_found(item_name: str, items_func: Callable[[], Any],
-                          retry_func: Callable[[], None]) -> None:
+                          retry_func: Callable[[], None]) -> Optional[str]:
     """
     Handles the case when no items are found and asks the user what to do next.
 
@@ -116,7 +116,17 @@ def handle_no_items_found(item_name: str, items_func: Callable[[], Any],
         retry_func (Callable[[], None]): Function to retry the search action.
 
     Returns:
-        None
+        Optional[str]: Returns the result of the action taken by the user (e.g., result of retry_func, items_func,
+                       or the action of returning to the main menu). If returning to the main menu, it calls
+                       `go_to_main_menu()`.
+
+    Description:
+        This function prompts the user with three options when no items matching their search criteria are found:
+        1. Retry the search for the specified item.
+        2. Display all available items of the specified type.
+        3. Exit to the main menu.
+
+        Based on the user's input, the function will either retry the search, display all items, or return to the main menu.
     """
     print(f"No {item_name} found with that search.")
 
@@ -130,15 +140,13 @@ def handle_no_items_found(item_name: str, items_func: Callable[[], Any],
 
         if retry_choice == '1':
             print(f"Let's try searching again for the {item_name}...")
-            retry_func()
-            return
+            return retry_func()
         elif retry_choice == '2':
             print(f"Showing all {item_name}s...")
             return items_func()
         elif retry_choice == '3' or retry_choice in ['exit', 'q']:
-            print("Returning to the main menu...")
             from hw_10.movie_db.ui.movie_database import go_to_main_menu
-            return go_to_main_menu()
+            return go_to_main_menu("According to your choice 'exit'")
         else:
             print("Invalid option. Please select 1, 2, or 3.")
 
