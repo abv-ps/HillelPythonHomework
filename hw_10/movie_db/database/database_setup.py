@@ -27,6 +27,7 @@ This module is designed to be run as a standalone script that will:
 
 Usage:
     python -m movie_db.database.database_setup
+    You should run this code at one level higher than the movie_db folder.
 """
 import os
 import sqlite3
