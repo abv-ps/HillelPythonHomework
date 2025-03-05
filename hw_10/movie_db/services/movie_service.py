@@ -21,7 +21,8 @@ from ..database.db_models import Movie, DatabaseHandler as DBHandler
 from ..utils.validators import Validator
 from ..utils.helpers import (
     choose_page_action,
-    handle_no_items_found
+    handle_no_items_found,
+    get_input
 )
 
 
@@ -66,14 +67,18 @@ class MovieService:
                            or None if no valid movie is found.
         """
         from ..ui.movie_database import go_to_main_menu
-        movie_name = input("Enter the movie title to search:").strip()
+        movie_title = input("Enter the movie title to search:").strip()
         v = Validator()
-        movie_name_sub = v.validate_title_movie(movie_name, "movie title")
+        movie_name_sub = v.validate_text_input(text=movie_title,
+                                               item_name="movie title",
+                                               validation_type="title_movie",
+                                               get_input=get_input
+                                               )
         if not movie_name_sub[0]:
             return go_to_main_menu("Movie title is empty")
-        movie_name = movie_name_sub[1]
+        movie_title = movie_name_sub[1]
 
-        movies = MovieService.find_movies_by_keyword(db, movie_name)
+        movies = MovieService.find_movies_by_keyword(db, movie_title)
 
         if not movies:
             return handle_no_items_found(
@@ -114,7 +119,11 @@ class MovieService:
         if not movie_title:
             movie_title = input("Please enter the movie title to add: ")
             v = Validator()
-            movie_name_sub = v.validate_title_movie(movie_title, "movie title")
+            movie_name_sub = v.validate_text_input(text=movie_title,
+                                               item_name="movie title",
+                                               validation_type="title_movie",
+                                               get_input=get_input
+                                               )
             if not movie_name_sub[0]:
                 return go_to_main_menu("Movie title is empty")
             movie_title = movie_name_sub[1]
@@ -134,7 +143,8 @@ class MovieService:
         v = Validator()
         is_valid, release_year = v.validate_year(
             year=int(input("To add the movie to the database, please enter its release year: ")),
-            year_type="release"
+            year_type="release",
+            get_input=get_input
         )
 
         if not is_valid:
@@ -145,7 +155,11 @@ class MovieService:
             genre = input("Genre is not entered. Please enter the movie genre: ").strip()
 
         if genre:
-            genre_sub = v.validate_actor_name_genre(genre, "genre")
+            genre_sub = v.validate_text_input(text=genre,
+                                               item_name="genre",
+                                               validation_type="actor_name_genre",
+                                               get_input=get_input
+                                               )
             if not genre_sub[0]:
                 print(f"The genre {genre_sub[1]} does not meet the requirements, "
                       f"so no genre is added to the movie '{movie_title}'.")

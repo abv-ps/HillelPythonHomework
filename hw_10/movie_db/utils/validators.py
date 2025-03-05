@@ -21,8 +21,11 @@ and simplify the validation of user input in a variety of use cases.
 """
 
 import re
+import logging
 import time
-from typing import Tuple
+from typing import Tuple, Callable
+
+logging.basicConfig(level=logging.WARNING)
 
 from ..utils.helpers import update_attempts
 
@@ -72,8 +75,8 @@ class Validator:
             year_ranges (dict): A dictionary containing valid year ranges for 'birth' and 'release'.
         """
         self.patterns = {
-            "title_movie": r"^([A-Za-zА-Яа-яІіЇїЄєҐґЁёЄєҐґ0-9-_@]{2,})(?:\s([A-Za-zА-Яа-яІіЇїЄєҐґЁёЄєҐґ0-9-_@]{2,}))*$",
-            "actor_name_genre": r"^([A-Za-zА-Яа-яІіЇїЄєҐґЁёЄєҐґ_-]{2,})(?:\s([A-Za-zА-Яа-яІіЇїЄєҐґЁёЄєҐґ_-]{2,}))*$"
+            "title_movie": r"^([A-Za-zА-Яа-яІіЇїЄєҐґЁёЄєҐґ0-9-]{2,})(?:\s([A-Za-zА-Яа-яІіЇїЄєҐґЁёЄєҐґ0-9-]{2,}))*$",
+            "actor_name_genre": r"^([A-Za-zА-Яа-яІіЇїЄєҐґЁёЄєҐґ-]{2,})(?:\s([A-Za-zА-Яа-яІіЇїЄєҐґЁёЄєҐґ-]{2,}))*$"
         }
         current_year = time.localtime().tm_year
         self.year_ranges = {
@@ -81,7 +84,7 @@ class Validator:
             "release": (1895, current_year)
         }
 
-    def validate(self, text: str, item_name: str, validation_type: str) -> bool:
+    def validate(self, text: str, item_name: str, validation_type: str) -> Tuple[bool, str]:
         """
         Validates a given text input based on the specified validation type.
 
@@ -97,42 +100,18 @@ class Validator:
         """
         pattern = self.patterns.get(validation_type)
         if not pattern:
-            print(f"Invalid validation type: {validation_type}")
-            return False
+            logging.error(f"Invalid validation type: {validation_type}")
+            return False, text
 
         if re.match(pattern, text):
-            return True
-        print(f"Invalid {item_name}! The {item_name} should consist of at least two letters at the beginning "
-              "with a possible separator and at least two letters after it.")
-        return False
+            return True, text
 
-    def validate_title_movie(self, text: str, item_name: str, max_attempts: int = 3) -> Tuple[bool, str]:
-        """
-        Validates a movie title with a limited number of attempts.
-
-        Args:
-            text (str): The movie title to be validated.
-            item_name (str): The name of the item being validated (e.g., 'movie title').
-            max_attempts (int): The maximum number of attempts allowed (default is 3).
-
-        Returns:
-            Tuple[bool, str]: A tuple where the first element is True if the title is valid, False otherwise,
-                               and the second element is the validated or last entered text.
-
-        The user is prompted to re-enter the title if it is invalid, up to the maximum number of attempts.
-        If the user enters "exit" or "q", the validation stops.
-        """
-        attempts = 0
-        while attempts < max_attempts and text not in self.EXIT_COMMANDS:
-            if self.validate(text, item_name, "title_movie"):
-                return True, text
-            attempts = update_attempts(attempts, max_attempts)
-            if attempts >= max_attempts:
-                return False, text
-            text = input(f"Please enter the {item_name} again: ").strip()
+        logging.warning(f"Invalid {item_name}! It should start with at least two letters, "
+                        "optionally have a separator, and contain at least two more letters.")
         return False, text
 
-    def validate_actor_name_genre(self, text: str, item_name: str, max_attempts: int = 3) -> Tuple[bool, str]:
+    def validate_text_input(self, text: str, item_name: str, validation_type: str,
+                            get_input: Callable[[], str], max_attempts: int = 3) -> Tuple[bool, str]:
         """
         Validates an actor name or genre with a limited number of attempts.
 
@@ -150,23 +129,24 @@ class Validator:
         If the maximum attempts are reached, an error message is shown.
         """
         attempts = 0
-        while attempts < max_attempts and text not in self.EXIT_COMMANDS:
-            if self.validate(text, item_name, "actor_name_genre"):
-                return True, text
+        while attempts < max_attempts and text.lower() not in self.EXIT_COMMANDS:
+            is_valid, valid_text = self.validate(text, item_name, validation_type)
+            if is_valid:
+                return True, valid_text
 
             attempts = update_attempts(attempts, max_attempts)
 
             if attempts >= max_attempts:
-                break
+                logging.warning("Maximum attempts reached. Invalid input.")
+                return False, text
 
-            text = input(f"Please enter the {item_name} again: ")
-
-        if text not in self.EXIT_COMMANDS:
-            print("Maximum attempts reached. Invalid input.")
+            logging.info(f"Invalid {item_name}. Please enter the {item_name} again:")
+            text = get_input().strip()
 
         return False, text
 
-    def validate_year(self, year: int, year_type: str, max_attempts: int = 3) -> Tuple[bool, int]:
+    def validate_year(self, year: int, year_type: str, get_input: Callable[[], str], max_attempts: int = 3) -> Tuple[
+        bool, int]:
         """
         Validates a year (either birth year or release year) within the specified range, with a limited number of attempts.
 
@@ -189,20 +169,22 @@ class Validator:
         attempts = 0
 
         while attempts < max_attempts:
-            if min_year <= year <= max_year:
+            if isinstance(year, int) and min_year <= year <= max_year:
                 return True, year
 
             attempts += 1
             if attempts >= max_attempts:
+                logging.warning("Maximum attempts reached. Invalid year input.")
                 return False, year
-
-            year_input = input(f"Enter a valid {year_type} year ({min_year}-{max_year}): ").strip()
+            logging.info(f"Enter a valid {year_type} year ({min_year}-{max_year}):")
+            year_input = get_input().strip()
             if year_input.lower() in self.EXIT_COMMANDS:
                 return False, year
 
             try:
                 year = int(year_input)
             except ValueError:
+                logging.warning(f"Invalid input. Please enter a valid {year_type} year.")
                 continue
 
         return False, year

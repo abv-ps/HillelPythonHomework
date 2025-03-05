@@ -169,5 +169,17 @@ def update_attempts(attempts: int, max_attempts: int) -> int:
     print(f"You have {max_attempts - attempts} attempts left.")
     return attempts
 
+def get_input() -> str:
+    """
+    Prompts the user for input from the console.
+
+    This function uses the built-in `input()` function to get a line of text
+    entered by the user. It returns the input as a string.
+
+    Returns:
+        str: The user's input as a string.
+    """
+    return input()
+
 
 

@@ -11,6 +11,7 @@ from typing import Optional
 
 from ..database.database_setup import Database as DBClass
 from ..database.db_models import Actor, DatabaseHandler as DBHandler
+from ..utils.helpers import get_input
 from ..utils.validators import Validator
 
 
@@ -61,7 +62,10 @@ class ActorService:
         if not actor_name:
             actor_name = input("Enter the actor's name: ")
             v = Validator()
-            actor_name_sub = v.validate_actor_name_genre(actor_name, "actor's name")
+            actor_name_sub = v.validate_text_input(text=actor_name,
+                                                   item_name="actor's name",
+                                                   validation_type="actor_name_genre",
+                                                   get_input=get_input)
 
             if not actor_name_sub[0]:
                 return go_to_main_menu("Actor name is empty.")
@@ -74,7 +78,8 @@ class ActorService:
             v = Validator()
             is_valid, birth_year = v.validate_year(
                 year=int(input("Enter the actor's birth year: ")),
-                year_type="birth"
+                year_type="birth",
+                get_input=get_input
             )
 
             if not is_valid:
