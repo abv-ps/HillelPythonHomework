@@ -48,13 +48,25 @@ def parallel_sum(numbers: List[int], num_processes: int) -> int:
     if len(numbers) % num_processes:
         chunks[-1].extend(numbers[num_processes * chunk_size:])
 
-    with multiprocessing.Pool(num_processes) as pool:
+    with multiprocessing.Pool(processes=num_processes) as pool:
         results = pool.map(partial_sum, chunks)
 
     return sum(results)
 
 
-if __name__ == "__main__":
+def main():
+    """
+    The main function of the program that generates a large array and calculates its sum using parallel processing.
+
+    This function performs the following steps:
+    1. Generates a large array (`large_array`) containing 100,000 random integers between 1 and 100.
+    2. Specifies the number of worker processes (`num_workers`) to use for parallel processing.
+    3. Calls the `parallel_sum()` function to compute the total sum of the array using the specified number of worker processes.
+    4. Prints the total sum of the array.
+
+    Returns:
+    None
+    """
     import random
 
     large_array = [random.randint(1, 100) for _ in range(100000)]
@@ -62,3 +74,7 @@ if __name__ == "__main__":
 
     total = parallel_sum(large_array, num_workers)
     print(f"Total sum: {total}")
+
+
+if __name__ == "__main__":
+    main()
