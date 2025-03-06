@@ -11,21 +11,24 @@ Usage:
     how to handle a timeout using asyncio.
 """
 import asyncio
+from logger_config import get_logger
+
+logger = get_logger(__name__, "slow_task.log")
 
 async def slow_task() -> None:
     """
     Simulates a task that takes 10 seconds to complete.
 
     This function uses asyncio.sleep() to simulate a long-running task that
-    takes 10 seconds. It prints a start message, waits for 10 seconds, and
-    then prints a completion message.
+    takes 10 seconds. It logs a start message, waits for 10 seconds, and
+    then logs a completion message.
 
     Returns:
         None: This function does not return any value.
     """
-    print("Starting slow task...")
+    logger.info("Starting slow task...")
     await asyncio.sleep(10)  # Simulates a task that takes 10 seconds
-    print("Slow task completed.")
+    logger.info("Slow task completed.")
 
 
 async def main() -> None:
@@ -34,7 +37,7 @@ async def main() -> None:
 
     The main function attempts to execute the slow_task, but with a timeout of 5 seconds.
     If the task does not complete within the timeout period, a TimeoutError is raised,
-    and a message is printed to the console indicating the timeout was exceeded.
+    and a message is logged indicating the timeout was exceeded.
 
     Returns:
         None: This function does not return any value.
@@ -43,7 +46,7 @@ async def main() -> None:
         # Use asyncio.wait_for to apply a timeout to slow_task
         await asyncio.wait_for(slow_task(), timeout=5)
     except asyncio.TimeoutError:
-        print("Timeout exceeded while waiting for the task to complete.")
+        logger.error("Timeout exceeded while waiting for the task to complete.")
 
 
 if __name__ == "__main__":

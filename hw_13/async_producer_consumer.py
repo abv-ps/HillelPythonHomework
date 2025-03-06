@@ -17,8 +17,11 @@ Usage:
 This module utilizes asyncio to manage concurrent execution and demonstrates the basic
 concept of task scheduling and consumption using a queue.
 """
-import asyncio
 
+import asyncio
+from logger_config import get_logger
+
+logger = get_logger(__name__, "producer_consumer.log")
 
 async def producer(queue: asyncio.Queue) -> None:
     """
@@ -34,7 +37,7 @@ async def producer(queue: asyncio.Queue) -> None:
         await asyncio.sleep(0.5)  # Simulate delay in task creation
         task = f"Task-{i}"
         await queue.put(task)
-        print(f"Produced: {task}")
+        logger.info(f"Produced: {task}")
 
     # Add completion markers for consumers
     for _ in range(3):  # 3 consumers will receive the termination signal
@@ -57,9 +60,9 @@ async def consumer(queue: asyncio.Queue, consumer_id: int) -> None:
         if task is None:  # Received termination signal
             queue.task_done()
             break
-        print(f"Consumer-{consumer_id} processing {task}")
+        logger.info(f"Consumer-{consumer_id} processing {task}")
         await asyncio.sleep(2)  # Simulate task processing
-        print(f"Consumer-{consumer_id} finished {task}")
+        logger.info(f"Consumer-{consumer_id} finished {task}")
         queue.task_done()
 
 

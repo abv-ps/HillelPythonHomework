@@ -21,6 +21,10 @@ Usage:
 import asyncio
 import random
 import aiohttp
+from logger_config import get_logger
+from error_handler import handle_action_error
+
+logger = get_logger(__name__, "downloaded_pages.log")
 
 UrlList = list[str]
 
@@ -33,32 +37,21 @@ async def download_page(url: str) -> None:
     Args:
         url (str): The URL of the page to download.
     """
-    # Random delay between 1 and 5 seconds to simulate downloading
     delay = random.randint(1, 5)
     await asyncio.sleep(delay)  # Wait for the random delay
 
-    # Now simulate the page download using aiohttp
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.get(url) as response:
-                if response.status == 200:
-                    print(f"Successfully downloaded {url} in {delay} seconds "
-                          f"with status code {response.status}")
-                elif response.status == 403:
-                    print(f"Error 403: Forbidden while downloading {url}")
-                elif response.status == 404:
-                    print(f"Error 404: Not Found while downloading {url}")
-                elif response.status == 504:
-                    print(f"Error 504: Gateway Timeout while downloading {url}")
-                else:
-                    print(f"Failed to download {url} in {delay} seconds "
-                          f"with status code {response.status}")
-        except aiohttp.ClientConnectionError:
-            print(f"Connection error while downloading {url}")
-        except aiohttp.ClientTimeout:
-            print(f"Timeout error while downloading {url}")
-        except Exception as e:
-            print(f"Error downloading {url}: {e}")
+
+    try:
+        async with aiohttp.ClientSession() as session:
+                async with session.get(url) as response:
+                    if response.status == 200:
+                        logger.info(f"Successfully downloaded {url} in "
+                                    f"{delay} seconds with status code {response.status}")
+                    else:
+                        await handle_action_error(url, "page_downloading",
+                                                  status_code=response.status)
+    except Exception as e:
+        await handle_action_error(url, "page_downloading", error=e)
 
 
 async def main(urls: UrlList) -> None:
@@ -70,10 +63,11 @@ async def main(urls: UrlList) -> None:
     """
     await asyncio.gather(*(download_page(url) for url in urls))
 
+
 if __name__ == "__main__":
     urls_to_download = [
-        "https://www.example.com",
-        "https://www.python.org",
-        "https://www.github.com"
+        "https://www.google.com",
+        "https://www.ithillel.ua",
+        "https://www.habr.com"
     ]
     asyncio.run(main(urls_to_download))

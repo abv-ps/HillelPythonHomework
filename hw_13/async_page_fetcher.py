@@ -22,23 +22,11 @@ Usage:
 """
 import asyncio
 import aiohttp
-import logging
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+from hw_13.error_handler import handle_action_error
+from logger_config import get_logger
 
-file_handler = logging.FileHandler("fetched_pages.log", encoding="utf-8")
-file_handler.setLevel(logging.INFO)
-
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(formatter)
-console_handler.setFormatter(formatter)
-
-logger.addHandler(file_handler)
-logger.addHandler(console_handler)
+logger = get_logger(__name__, "fetched_pages.log")
 
 UrlList = list[str]
 
@@ -54,19 +42,6 @@ async def fetch_content(url: str) -> str:
     Returns:
         The content of the page or an error message.
     """
-    status_messages = {
-        204: "No content found (Status 204)",
-        206: "Partial content returned (Status 206)",
-        301: "Redirected permanently (Status 301)",
-        401: "Unauthorized access (Status 401)",
-        403: "Forbidden access (Status 403)",
-        404: "Not found (Status 404)",
-        408: "Request timed out (Status 408)",
-        413: "Payload too large (Status 413)",
-        503: "Service unavailable (Status 503)",
-        505: "HTTP version not supported (Status 505)"
-    }
-
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
@@ -74,21 +49,10 @@ async def fetch_content(url: str) -> str:
                     logger.info(f"Successfully fetched {url} (Status 200)")
                     return await response.text()
 
-                error_message = status_messages.get(response.status, f"Failed with status {response.status}")
-                logger.warning(f"{url} - {error_message}")
-                return error_message
-    except aiohttp.ClientConnectionError as e:
-        error_connection = f"Connection error while fetching {url}"
-        logger.error(error_connection)
-        return error_connection
-    except aiohttp.ClientTimeout as e:
-        error_timeout = f"Timeout error while fetching {url}"
-        logger.error(error_timeout)
-        return error_timeout
+                return await handle_action_error(url, action="fetching", status_code=response.status)
     except Exception as e:
-        error_msg = f"Unexpected error while fetching {url}"
-        logger.error(error_msg.format(url=url, error=e))
-        return error_msg.format(url=url, error=e)
+        return await handle_action_error(url, action="fetching", error=e)
+
 
 
 async def fetch_all(urls: UrlList) -> list[str]:
@@ -113,14 +77,14 @@ async def main(urls: UrlList) -> None:
     """
     contents = await fetch_all(urls)
     for url, content in zip(urls, contents):
-        #For better representation, only process the first 1000 characters
+        # For better representation, only process the first 1000 characters
         print(f"--- {url} ---\n{content[:1000]}...\n")
 
 
 if __name__ == "__main__":
     urls_to_download = [
-        "https://www.example.com",
-        "https://www.python.org",
-        "https://www.github.com"
+        "https://www.google.com",
+        "https://www.ithillel.ua",
+        "https://www.habr.com"
     ]
     asyncio.run(main(urls_to_download))
