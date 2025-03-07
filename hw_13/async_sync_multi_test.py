@@ -38,10 +38,10 @@ Usage:
     The URL to test can be modified in the 'async_web_server.py' script.
 """
 import time
-import requests
-import asyncio
-import aiohttp
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+import asyncio
+import requests
+import aiohttp
 from logger_config import get_logger
 
 logger = get_logger(__name__, "multi_test_results.log")
@@ -58,10 +58,12 @@ def send_request_sync(url: str) -> None:
         None
     """
     try:
-        response = requests.get(url)
-        logger.info(f"Synchronous: {response.status_code} {response.text}")
+        response = requests.get(url, timeout=5)
+        logger.info("Synchronous: %s %s", response.status_code, response.text)
+    except requests.Timeout:
+        logger.error("Request timed out for URL: %s", url)
     except requests.RequestException as e:
-        logger.error(f"Error: {e}")
+        logger.error("Error: %s", e)
 
 
 async def send_request_async(url: str) -> None:
@@ -77,7 +79,7 @@ async def send_request_async(url: str) -> None:
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as response:
             text = await response.text()
-            logger.info(f"Async: {response.status} {text}")
+            logger.info("Async: %s %s", response.status, text)
 
 
 def test_sync(url: str, count: int) -> None:
@@ -95,7 +97,7 @@ def test_sync(url: str, count: int) -> None:
     for _ in range(count):
         send_request_sync(url)
     total_time = time.time() - start
-    logger.info(f"Synchronous mode took {total_time:.2f} sec")
+    logger.info("Synchronous mode took %.2f sec", total_time)
 
 
 def test_multithreaded(url: str, count: int) -> None:
@@ -114,7 +116,7 @@ def test_multithreaded(url: str, count: int) -> None:
     with ThreadPoolExecutor() as executor:
         executor.map(send_request_sync, [url] * count)
     total_time = time.time() - start
-    logger.info(f"Multi-threaded mode took {total_time:.2f} sec")
+    logger.info("Multi-threaded mode took %.2f sec", total_time)
 
 
 def test_multiprocess(url: str, count: int) -> None:
@@ -133,7 +135,7 @@ def test_multiprocess(url: str, count: int) -> None:
     with ProcessPoolExecutor() as executor:
         executor.map(send_request_sync, [url] * count)
     total_time = time.time() - start
-    logger.info(f"Multi-process mode took {total_time:.2f} sec")
+    logger.info("Multi-process mode took %.2f sec", total_time)
 
 
 async def test_async(url: str, count: int) -> None:
@@ -152,7 +154,7 @@ async def test_async(url: str, count: int) -> None:
     tasks = [send_request_async(url) for _ in range(count)]
     await asyncio.gather(*tasks)
     total_time = time.time() - start
-    logger.info(f"Asynchronous mode took {total_time:.2f} sec")
+    logger.info("Asynchronous mode took %.2f sec", total_time)
 
 
 if __name__ == "__main__":

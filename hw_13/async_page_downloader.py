@@ -13,9 +13,10 @@ Functions:
         Downloads multiple pages concurrently by calling `download_page` for each URL in the list.
 
 Usage:
-    This module can be used to simulate the concurrent downloading of pages in an asynchronous manner.
-    You can provide a list of URLs to the `main` function, and it will download the pages concurrently,
-    simulating realistic delays for each page.
+    This module can be used to simulate the concurrent downloading of pages
+    in an asynchronous manner.
+    You can provide a list of URLs to the `main` function, and it will download
+    the pages concurrently, simulating realistic delays for each page.
 """
 
 import asyncio
@@ -40,16 +41,16 @@ async def download_page(url: str) -> None:
     delay = random.randint(1, 5)
     await asyncio.sleep(delay)  # Wait for the random delay
 
-
     try:
         async with aiohttp.ClientSession() as session:
-                async with session.get(url) as response:
-                    if response.status == 200:
-                        logger.info(f"Successfully downloaded {url} in "
-                                    f"{delay} seconds with status code {response.status}")
-                    else:
-                        await handle_action_error(url, "page_downloading",
-                                                  status_code=response.status)
+            async with session.get(url) as response:
+                if response.status == 200:
+                    logger.info("Successfully downloaded %s in %s seconds "
+                                "with status code %d", url, delay, response.status)
+
+                else:
+                    await handle_action_error(url, "page_downloading",
+                                              status_code=response.status)
     except Exception as e:
         await handle_action_error(url, "page_downloading", error=e)
 

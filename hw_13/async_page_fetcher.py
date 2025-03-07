@@ -23,7 +23,7 @@ Usage:
 import asyncio
 import aiohttp
 
-from hw_13.error_handler import handle_action_error
+from error_handler import handle_action_error
 from logger_config import get_logger
 
 logger = get_logger(__name__, "fetched_pages.log")
@@ -46,10 +46,11 @@ async def fetch_content(url: str) -> str:
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
                 if response.status == 200:
-                    logger.info(f"Successfully fetched {url} (Status 200)")
+                    logger.info("Successfully fetched %s (Status 200)", url)
                     return await response.text()
 
-                return await handle_action_error(url, action="fetching", status_code=response.status)
+                return await handle_action_error(url, action="fetching",
+                                                 status_code=response.status)
     except Exception as e:
         return await handle_action_error(url, action="fetching", error=e)
 

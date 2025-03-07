@@ -1,8 +1,9 @@
 """
 This module demonstrates a producer-consumer pattern using asyncio and a queue.
 
-The producer generates tasks and adds them to the queue with a delay. Multiple consumers concurrently
-process the tasks from the queue. Once all tasks are processed, the program completes.
+The producer generates tasks and adds them to the queue with a delay.
+Multiple consumers concurrently process the tasks from the queue.
+Once all tasks are processed, the program completes.
 
 The program consists of three main asynchronous functions:
     - producer(queue: asyncio.Queue) -> None: Simulates the production of tasks.
@@ -37,7 +38,7 @@ async def producer(queue: asyncio.Queue) -> None:
         await asyncio.sleep(0.5)  # Simulate delay in task creation
         task = f"Task-{i}"
         await queue.put(task)
-        logger.info(f"Produced: {task}")
+        logger.info("Produced: %s, task", task)
 
     # Add completion markers for consumers
     for _ in range(3):  # 3 consumers will receive the termination signal
@@ -60,9 +61,9 @@ async def consumer(queue: asyncio.Queue, consumer_id: int) -> None:
         if task is None:  # Received termination signal
             queue.task_done()
             break
-        logger.info(f"Consumer-{consumer_id} processing {task}")
+        logger.info("Consumer-%s processing %s", consumer_id, task)
         await asyncio.sleep(2)  # Simulate task processing
-        logger.info(f"Consumer-{consumer_id} finished {task}")
+        logger.info("Consumer-%s finished %s", consumer_id, task)
         queue.task_done()
 
 
@@ -76,7 +77,7 @@ async def main() -> None:
     Returns:
         None
     """
-    queue = asyncio.Queue()
+    queue: asyncio.Queue = asyncio.Queue()
 
     # Start the producer and multiple consumers
     producer_task = asyncio.create_task(producer(queue))

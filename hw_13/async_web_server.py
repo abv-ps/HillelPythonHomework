@@ -36,7 +36,8 @@ async def handle_root(request: web.Request) -> web.Response:
     Returns:
         web.Response: A response with the text "Hello, World!".
     """
-    logger.info("Received request at '/'")
+    client_ip = request.remote
+    logger.info("Received request from %s: %s %s", client_ip, request.method, request.path)
     return web.Response(text="Hello, World!")
 
 
@@ -52,9 +53,10 @@ async def handle_slow(request: web.Request) -> web.Response:
     Returns:
         web.Response: A response with the text "Operation completed".
     """
-    logger.info("Received request at '/slow', simulating delay...")
+    client_ip = request.remote
+    logger.info("Received request from %s at '/slow', simulating delay...", client_ip)
     await asyncio.sleep(5)
-    logger.info("Completed slow task.")
+    logger.info("Completed slow task for client %s.", client_ip)
     return web.Response(text="Operation completed")
 
 
@@ -78,7 +80,7 @@ async def run_test_script(test_file: str) -> None:
     Args:
         test_file (str): The path to the test script.
     """
-    logger.info(f"Running test script: {test_file}")
+    logger.info("Running test script: %s", test_file)
 
     process = await asyncio.create_subprocess_exec(
         sys.executable, test_file,
@@ -88,9 +90,11 @@ async def run_test_script(test_file: str) -> None:
     stdout, stderr = await process.communicate()
 
     if process.returncode == 0:
-        logger.info(f"Test script {test_file} completed successfully.")
+        logger.info("Test script %s completed successfully. Output:\n%s",
+                    test_file, stdout.decode())
     else:
-        logger.error(f"Test script {test_file} failed with error: {stderr.decode()}")
+        logger.error("Test script %s failed with error: %s",
+                     test_file, stderr.decode())
 
 
 async def run_server() -> None:
