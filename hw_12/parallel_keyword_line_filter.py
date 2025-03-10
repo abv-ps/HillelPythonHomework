@@ -30,6 +30,7 @@ Usage:
 
 import os
 import re
+import signal
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from typing import Iterator
@@ -194,6 +195,12 @@ def process_files_concurrently(file_paths: list, output_directory: str,
                                     keyword),
                      file_paths)
 
+def signal_handler(signum, frame):
+    """
+    Обробник сигналу для SIGINT (Ctrl+C).
+    """
+    logger.info("\nProcess interrupted by the user. Exiting gracefully...")
+    sys.exit(0)
 
 def main():
     """
@@ -213,17 +220,22 @@ def main():
     Returns:
     None
     """
-    folder_paths = get_file_from_directory()
-    input_file_paths = folder_paths[0]
-    output_file_path = folder_paths[1]
-    search_keyword = folder_paths[2]
+    try:
+        signal.signal(signal.SIGINT, signal_handler)
+        folder_paths = get_file_from_directory()
+        input_file_paths = folder_paths[0]
+        output_file_path = folder_paths[1]
+        search_keyword = folder_paths[2]
 
-    output_directory = os.path.dirname(output_file_path)
+        output_directory = os.path.dirname(output_file_path)
 
-    process_files_concurrently(input_file_paths, output_directory, search_keyword)
+        process_files_concurrently(input_file_paths, output_directory, search_keyword)
 
-    logger.info("Filtered lines containing '%s' have been saved "
+        logger.info("Filtered lines containing '%s' have been saved "
                 "to corresponding output files.", search_keyword)
+    except KeyboardInterrupt:
+        logger.info("\nProcess interrupted by the user. Exiting...")
+        sys.exit(0)
 
 
 if __name__ == "__main__":
