@@ -1,40 +1,43 @@
 """
-This module provides functionality for processing large log files, filtering lines
-that contain a specific keyword, and saving the filtered lines to new files.
-The processing is done concurrently using threads for improved performance.
+This module provides efficient processing of large log files by filtering lines
+that contain a specified keyword. It leverages concurrent threading to process
+multiple log files in parallel, improving performance for large datasets.
 
-Key features of the module:
-- Filters lines containing a specified keyword (case-insensitive) from large log files.
-- Processes multiple log files concurrently using threads.
-- Allows the user to interactively select log files, specify the keyword,
-  and choose the output directory.
-- Saves the filtered lines to a new file, including the line number of each matching line.
+Key features:
+- Filters lines containing a given keyword (case-insensitive) from large log files.
+- Supports concurrent processing of multiple log files using threads.
+- Provides an interactive interface for selecting log files, specifying the keyword,
+  and choosing the output directory.
+- Saves filtered lines, including the line number of each match, to new files.
 
 Classes:
-- KeywordLineFilter: A generator class that reads a large text file line by line
-  and filters lines that contain a specified keyword.
+- KeywordLineFilter: A generator that reads a large log file line by line and filters
+  lines containing the specified keyword.
 
 Functions:
-- save_filtered_lines: Reads a file, filters lines containing the specified keyword,
-  and writes them to a new file.
-- get_file_from_directory: Prompts the user to select log files, output directory,
-  and keyword for filtering.
-- process_file: Processes an individual file to filter lines containing
-  the keyword using a separate thread.
+- save_filtered_lines: Filters lines from an input file and writes them to an output file.
+- get_user_input: Collects user input for paths, files, and keywords, with default values.
+- get_file_from_directory: Prompts the user to select log files, output directory, and keyword.
+- process_file: Filters a single log file in a separate thread and saves the results.
 - process_files_concurrently: Processes multiple log files concurrently using threads.
 
 Usage:
-1. The user is prompted to input a folder path containing log files, select the files,
+1. The user is prompted to provide a folder path containing log files, select the files,
    and specify a keyword for filtering.
-2. The selected files are processed concurrently, with filtered lines being saved
+2. The module processes the selected files concurrently, saving the filtered results
    to new files in the specified output directory.
 """
 
 import os
 import re
 import sys
-import threading
+from concurrent.futures import ThreadPoolExecutor
 from typing import Iterator
+
+from error_handler import handle_file_error
+from logger_config import get_logger
+
+logger = get_logger(__name__, "parallel_keyword_line_filter.log")
 
 
 class KeywordLineFilter:
@@ -64,10 +67,14 @@ class KeywordLineFilter:
         Yields:
             str: The filtered lines containing the keyword with line numbers.
         """
-        with open(self.file_name, 'r', encoding=self.encoding, errors='replace') as file:
-            for line_number, line in enumerate(file, start=1):
-                if re.search(self.keyword, line, re.IGNORECASE):
-                    yield f"Line {line_number}: {line.strip()}"
+        try:
+            with open(self.file_name, 'r', encoding=self.encoding, errors='replace') as file:
+                for line_number, line in enumerate(file, start=1):
+                    if re.search(self.keyword, line, re.IGNORECASE):
+                        yield f"Line {line_number}: {line.strip()}"
+        except Exception as e:
+            handle_file_error("read", self.file_name, e)
+            raise
 
 
 def save_filtered_lines(input_file: str, output_file: str, keyword: str = 'Error') -> None:
@@ -79,9 +86,31 @@ def save_filtered_lines(input_file: str, output_file: str, keyword: str = 'Error
         output_file (str): The path to the output file.
         keyword (str): The keyword to filter lines.
     """
-    with open(output_file, 'w', encoding='utf-8') as output:
-        for line in KeywordLineFilter(input_file, keyword):
-            output.write(line + '\n')
+    try:
+        with open(output_file, 'w', encoding='utf-8') as output:
+            for line in KeywordLineFilter(input_file, keyword):
+                output.write(line + '\n')
+    except Exception as e:
+        handle_file_error("save", input_file, e)
+
+
+def get_user_input(prompt: str, default: str) -> str:
+    """
+    A helper function to get user input with handling for KeyboardInterrupt.
+
+    Args:
+        prompt (str): The prompt message to display.
+        default (str): The default value to use if the user does not input anything.
+
+    Returns:
+        str: The user input, or the default value if the user pressed Enter without input.
+    """
+    try:
+        user_input = input(f"{prompt} (default: {default}): ").strip()
+        return user_input if user_input else default
+    except KeyboardInterrupt:
+        logger.info("Process interrupted by the user. Exiting...")
+        sys.exit(0)
 
 
 def get_file_from_directory() -> tuple[list[str], str, str]:
@@ -94,48 +123,42 @@ def get_file_from_directory() -> tuple[list[str], str, str]:
                                     output file path, and search keyword.
     """
     default_path = os.path.join(os.getcwd(), "log_for_test")
-    user_input_log = input(f"Enter the folder path for log files "
-                           f"(default: {default_path}): ").strip()
-    log_directory = user_input_log if user_input_log else default_path
-
+    log_directory = get_user_input("Enter the folder path for log files", default_path)
     if not os.path.isdir(log_directory):
-        print("Invalid directory path.")
-        sys.exit()
+        logger.error("Invalid directory path.")
+        sys.exit(0)
 
     log_files = [f for f in os.listdir(log_directory) if f.endswith(".log")]
 
     if not log_files:
-        print("No log files found in the selected directory.")
-        sys.exit()
+        logger.error("No log files found in the selected directory.")
+        sys.exit(0)
 
     print("Available log files:")
     for i, file in enumerate(log_files, start=1):
         print(f"{i}: {file}")
 
+    file_indexes = get_user_input("Enter the numbers of the log files "
+                                  "you want to analyze, separated by commas", "")
     try:
-        file_indexes = input("Enter the numbers of the log files you want to analyze, "
-                             "separated by commas: ")
         selected_indexes = [int(index.strip()) - 1
                             for index in file_indexes.split(',')]  # Parse the indexes
         if any(index < 0 or index >= len(log_files) for index in selected_indexes):
             raise ValueError
     except ValueError:
-        print("Invalid selection.")
+        logger.error("Invalid selection.")
         sys.exit()
 
     input_file_paths = [os.path.join(log_directory, log_files[index])
                         for index in selected_indexes]
-
-    user_input_out = input(f"Enter the folder path for the output file "
-                           f"(default: {default_path}): ").strip()
-    output_directory = user_input_out or default_path
+    output_directory = get_user_input("Enter the folder path for the output file",
+                                      default_path)
 
     if not os.path.isdir(output_directory):
-        print("Invalid output directory.")
+        logger.error("Invalid output directory.")
         sys.exit()
 
-    search_keyword = input("Enter the keyword to search for "
-                           "(default: 'Error'): ").strip() or "Error"
+    search_keyword = get_user_input("Enter the keyword to search for", "Error")
     output_file_path = os.path.join(output_directory, f"filtered_{search_keyword}.txt")
 
     return input_file_paths, output_file_path, search_keyword
@@ -149,9 +172,9 @@ def process_file(input_file_path: str, output_file_path: str, keyword: str) -> N
         output_file_path (str): The output file path.
         keyword (str): The keyword to search for.
     """
-    print(f"Processing file: {input_file_path}")
+    logger.info("Processing file: %s", input_file_path)
     save_filtered_lines(input_file_path, output_file_path, keyword)
-    print(f"Finished processing file: {input_file_path}")
+    logger.info("Finished processing file: %s", input_file_path)
 
 
 def process_files_concurrently(file_paths: list, output_directory: str,
@@ -164,16 +187,12 @@ def process_files_concurrently(file_paths: list, output_directory: str,
         output_directory (str): The output directory for filtered results.
         keyword (str): The keyword to filter lines.
     """
-    threads = []
-    for file_path in file_paths:
-        output_file_path = os.path.join(output_directory, f"filtered_{os.path.basename(file_path)}")
-        thread = threading.Thread(target=process_file, args=(file_path, output_file_path, keyword))
-        threads.append(thread)
-        thread.start()
-
-    # Wait for all threads to finish
-    for thread in threads:
-        thread.join()
+    with ThreadPoolExecutor() as executor:
+        executor.map(lambda file_path: process_file(file_path,
+                                    os.path.join(output_directory,
+                                                 f"filtered_{os.path.basename(file_path)}"),
+                                    keyword),
+                     file_paths)
 
 
 def main():
@@ -203,8 +222,8 @@ def main():
 
     process_files_concurrently(input_file_paths, output_directory, search_keyword)
 
-    print(f"Filtered lines containing '{search_keyword}' have been saved "
-          f"to corresponding output files.")
+    logger.info("Filtered lines containing '%s' have been saved "
+                "to corresponding output files.", search_keyword)
 
 
 if __name__ == "__main__":

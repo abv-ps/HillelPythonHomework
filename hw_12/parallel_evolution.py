@@ -26,6 +26,10 @@ Functions:
 """
 import random
 import multiprocessing
+from typing import Optional
+from logger_config import get_logger
+
+logger = get_logger(__name__,"evolution_simulator.log")
 
 
 class Organism:
@@ -72,8 +76,9 @@ class Organism:
             self.food -= 1
         else:
             self.health -= 1  # Lose health if no food
+            logger.debug("No food available for organism. Health decreased.")
 
-    def reproduce(self) -> "Organism | None":
+    def reproduce(self) -> Optional["Organism"]:
         """
         Attempts to reproduce based on the reproduction chance.
 
@@ -81,6 +86,7 @@ class Organism:
             Organism | None: A new organism if reproduction is successful, otherwise None.
         """
         if random.random() < self.reproduction_chance:
+            logger.debug("Organism reproduced successfully.")
             return Organism(
                 health=random.randint(5, 15),
                 food=random.randint(3, 10),
@@ -91,23 +97,27 @@ class Organism:
 
     def catch_disease(self) -> None:
         """Determines if the organism catches a disease."""
-        if not self.is_sick and random.random() < self.disease_chance:
-            self.is_sick = True
-            self.health -= 2
+        if self.is_sick or random.random() >= self.disease_chance:
+            return
+        self.is_sick = True
+        self.health -= 2
+        logger.warning("Organism caught a disease, health decreased.")
 
     def heal(self) -> None:
         """Gives the organism a chance to recover from illness."""
         if self.is_sick and random.random() < 0.3:
             self.is_sick = False
             self.health += 3  # Healing improves health by 3
+            logger.info("Organism healed from disease, health increased.")
 
     def age(self) -> None:
         """Reduces health over time and applies additional penalty if sick."""
         self.health -= 2  # Natural aging
         if self.is_sick:
             self.health -= 2  # Additional health loss due to illness
+            logger.debug("Organism aged, health decreased due to illness.")
 
-    def live(self) -> tuple[list, list]:
+    def live(self) -> tuple[list["Organism"], list["Organism"]]:
         """
         Simulates a single step of the organism's life cycle.
         - Eats food
@@ -116,7 +126,7 @@ class Organism:
         - May get sick or recover
 
         Returns:
-            tuple: A tuple containing two lists:
+            tuple[list["Organism"], list["Organism"]]: A tuple containing two lists:
                 - The first list contains the current organism if it is still alive,
                   otherwise it's empty.
                 - The second list contains the offspring if reproduction occurred,
@@ -128,10 +138,11 @@ class Organism:
         self.heal()
         offspring = self.reproduce()
 
+        logger.debug("Organism alive with health: %s", self.health)
         return [self] if self.health > 0 else [], [offspring] if offspring else []
 
 
-def simulate_organism_life(organism: Organism) -> tuple:
+def simulate_organism_life(organism: Organism) -> tuple[list[Organism], list[Organism]]:
     """
     Simulate the life cycle of a single organism, including eating, reproducing,
     catching disease, and aging.
@@ -141,9 +152,13 @@ def simulate_organism_life(organism: Organism) -> tuple:
         organism (Organism): The organism to simulate life for.
 
     Returns:
-        tuple: A tuple containing the current organism and a newly reproduced organism (if any).
+        tuple[list[Organism], list[Organism]]: A tuple containing the current organism
+                                               and a newly reproduced organism (if any).
                If the organism does not survive, both values in the tuple will be None.
     """
+    result = organism.live()
+    if not result[0]:
+        logger.debug("Organism died.")
     return organism.live()
 
 
@@ -169,7 +184,7 @@ def evolve_population(population_size: int, generations: int, num_processes: int
     ]
 
     for generation in range(generations):
-        print(f"Generation {generation + 1}...")
+        logger.info("Generation %s starting...", generation + 1)
 
         # Use multiprocessing to simulate the life of each organism concurrently
         with multiprocessing.Pool(processes=num_processes) as pool:
@@ -181,11 +196,13 @@ def evolve_population(population_size: int, generations: int, num_processes: int
             population.extend(old_organisms)
             population.extend(new_organisms)
 
-        print(f"Population size: {len(population)}")
+        logger.info("Population size after generation %s: %s", generation + 1, len(population))
 
     return population
 
 
 if __name__ == "__main__":
+    multiprocessing.set_start_method("spawn")
+    logger.info("Simulation started.")
     final_population = evolve_population(population_size=77, generations=15, num_processes=4)
-    print(f"Final population size: {len(final_population)}")
+    logger.info("Final population size: %s", len(final_population))

@@ -18,22 +18,19 @@ Usage:
     Multiple threads are created to send GET requests to the server, and the responses are printed.
     To stop the server, use Ctrl+C in the terminal.
 """
-import logging
-import time
 import threading
+import time
 import http.server
+from concurrent.futures import ThreadPoolExecutor
 from typing import Tuple
 import requests
-from log_wrapper import log_wrapper
 
-logging.basicConfig(
-    filename='server_requests.log',
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+from logger_config import get_logger
+from error_handler import handle_action_error
+
+logger = get_logger(__name__, "parallel_http_threading.log")
 
 
-@log_wrapper
 class ThreadedHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     """
     Custom HTTP request handler that serves responses to multiple clients using threads.
@@ -79,9 +76,10 @@ class ThreadedHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         self._status_code = 200
         self._response_body = message
+        logger.debug("Responded to GET request with message: %s", message)
 
 
-def run_server(host: str = "127.0.0.1", port: int = 7777) -> None:
+def run_server(host: str = "127.0.0.1", port: int = 7777) -> http.server.ThreadingHTTPServer:
     """
     Starts a threaded HTTP server.
 
@@ -90,11 +88,10 @@ def run_server(host: str = "127.0.0.1", port: int = 7777) -> None:
         port (int): The port number to listen on.
     """
     server_address: Tuple[str, int] = (host, port)
-    httpd: http.server.ThreadingHTTPServer = http.server.ThreadingHTTPServer(
-        server_address, ThreadedHTTPRequestHandler
-    )
-    print(f"Serving HTTP on {host} port {port} (Press Ctrl+C to stop)...")
+    httpd = http.server.ThreadingHTTPServer(server_address, ThreadedHTTPRequestHandler)
+    logger.info("Server started on %s port %s...", host, port)
     httpd.serve_forever()
+    return httpd
 
 
 def send_request() -> None:
@@ -104,9 +101,26 @@ def send_request() -> None:
     Handles possible network errors.
     """
     try:
-        response = requests.get("http://127.0.0.1:7777", timeout=5)
-        print(response.text)
+        logger.info("Sending GET request to the server...")
+        response = requests.get("http://127.0.0.1:7777", timeout=10)
+
+        if response.status_code == 200:
+            logger.info("Received response: %s", response.text)
+        else:
+            error_message = handle_action_error(
+                url="http://127.0.0.1:7777",
+                action="fetching",
+                status_code=response.status_code
+            )
+            logger.error(error_message)
+
     except requests.exceptions.RequestException as e:
+        error_message = handle_action_error(
+            url="http://127.0.0.1:7777",
+            action="sending GET request",
+            error=e
+        )
+        logger.error(error_message)
         print(f"Request failed: {e}")
 
 
@@ -129,18 +143,19 @@ def main() -> None:
     Returns:
         None
     """
-    server_thread = threading.Thread(target=run_server, daemon=True)
+    logger.info("Starting the simulation...")
+
+    # Starting the server in a separate thread
+    server_thread = threading.Thread(target=run_server, args=("127.0.0.1", 7777), daemon=True)
     server_thread.start()
 
-    time.sleep(0.5)
+    time.sleep(2)
 
-    threads = [threading.Thread(target=send_request) for _ in range(5)]
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        for _ in range(5):
+            executor.submit(send_request)
 
-    for thread in threads:
-        thread.start()
-
-    for thread in threads:
-        thread.join()
+    logger.info("Simulation completed.")
 
 
 if __name__ == "__main__":

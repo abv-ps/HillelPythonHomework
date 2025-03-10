@@ -66,6 +66,7 @@ def main():
     n = int(input("Enter a number to calculate the factorial: "))
     num_processes = int(input("Enter the number of processes: "))
 
+
     factorial = parallel_factorial(n, num_processes)
     print(f"The factorial of {n} is {factorial}")
 
