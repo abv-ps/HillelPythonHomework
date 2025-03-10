@@ -1,17 +1,46 @@
-import os
+"""
+This module is designed to handle various types of errors that can occur
+during HTTP operations such as fetching, downloading, and parsing resources.
+It provides a function `handle_action_error` to process and log errors related
+to network issues, timeouts, response errors, and payload issues. It also
+returns detailed error messages based on the specific error type or HTTP
+status code encountered.
+
+Dependencies:
+    - aiohttp: A Python library used for asynchronous HTTP requests.
+    - logger_config: A custom logging module to configure and generate logs for errors.
+
+Key Components:
+    1. status_messages Dictionary: A predefined set of status codes and their corresponding
+       messages to describe the nature of the HTTP error encountered (e.g., 404 - "Not Found",
+       503 - "Service Unavailable").
+
+    2. handle_action_error Function:
+        Args:
+            url (str): The URL or resource being processed.
+            action (str): The action being performed (fetching, downloading, etc.).
+            error (Optional[Exception]): The exception object if an error occurs.
+            status_code (Optional[int]): The HTTP status code returned, if applicable.
+
+        Returns:
+            str: A string containing an error message that describes the error or status.
+
+        Error Handling:
+            The function handles specific exceptions raised by the `aiohttp` library, such as
+            connection errors, timeouts, response errors, and payload errors.
+            If a status code is provided, the function will return an appropriate message
+            from the `status_messages` dictionary or a generic error message.
+
+    3. Logging:
+        Errors are logged to a file (`action_error.log`) using the `get_logger` utility function.
+        The log captures the details of the action, URL, error type, and status code.
+"""
 from typing import Optional
 
 import aiohttp
 from logger_config import get_logger
 
 logger = get_logger(__name__, "action_error.log")
-
-def shutdown_logger() -> None:
-    """Closes all handlers for the logger to release the file lock."""
-    handlers = logger.handlers[:]
-    for handler in handlers:
-        handler.close()
-        logger.removeHandler(handler)
 
 status_messages = {
     204: "No content found (Status 204)",
@@ -28,9 +57,11 @@ status_messages = {
 
 
 async def handle_action_error(url: str, action: str,
-                              error: Optional[Exception] = None, status_code: Optional[int] = None) -> str:
+                              error: Optional[Exception] = None,
+                              status_code: Optional[int] = None) -> str:
     """
-    Handles various types of errors that can occur during an HTTP operation (fetch, download, parse).
+    Handles various types of errors that can occur
+    during an HTTP operation (fetch, download, parse).
 
     Args:
         url: The URL or resource being processed.
@@ -41,68 +72,31 @@ async def handle_action_error(url: str, action: str,
     Returns:
         A string containing the error message.
     """
-    try:
-        if error:
-            if isinstance(error, aiohttp.ClientConnectionError):
-                error_message = "Connection error while %s %s, Status: %s" % (action, url, error)
-                logger.error(error_message)
-                return error_message
-            elif isinstance(error, aiohttp.ClientTimeout):
-                error_message = "Timeout error while %s %s, Status: %s" % (action, url, error)
-                logger.error(error_message)
-                return error_message
-            elif isinstance(error, aiohttp.ClientResponseError):
-                error_message = "Response error while %s %s, Status: %s" % (action, url, error.status)
-                logger.error(error_message)
-                return error_message
-            elif isinstance(error, aiohttp.ClientPayloadError):
-                error_message = "Payload error while %s %s, Status: %s" % (action, url, error)
-                logger.error(error_message)
-                return error_message
-            else:
-                error_message = "Unexpected error while %s %s: %s" % (action, url, error)
-                logger.error(error_message)
-                await cleanup_log_file("action_error.log")
-                return error_message
-        elif status_code:
-            error_message = status_messages.get(status_code, "Failed with status %s during %s" % (status_code, action))
-            logger.warning("%s - Status Code: %s - %s" % (url, status_code, error_message))
-            return error_message
+    error_message = None
 
-        return "Unknown error occurred during %s %s" % (action, url)
-    finally:
-        # Clean up the log file after all processing is done
-        logger.info("Performing log file cleanup...")
-        await cleanup_log_file("action_error.log")
+    if error:
+        if isinstance(error, aiohttp.ClientConnectionError):
+            error_message = f"Connection error while {action} {url}, Status: {error}"
+            logger.error(error_message)
+        if isinstance(error, aiohttp.ClientTimeout):
+            error_message = f"Timeout error while {action} {url}, Status: {error}"
+            logger.error(error_message)
+        if isinstance(error, aiohttp.ClientResponseError):
+            error_message = f"Response error while {action} {url}, Status: {error}"
+            logger.error(error_message)
+        if isinstance(error, aiohttp.ClientPayloadError):
+            error_message = f"Payload error while {action} {url}, Status: {error}"
+            logger.error(error_message)
+        error_message = f"Unexpected error while {action} {url}, Status: {error}"
+        logger.error(error_message)
 
+    if status_code and not error_message:
+        error_message = status_messages.get(status_code,
+                                            f"Failed with status {status_code} "
+                                            f"during {action} - {url}")
+        logger.warning("%s - Status Code: %s - %s", url, status_code, error_message)
 
-async def cleanup_log_file(log_file: str) -> None:
-    """
-    Cleans up the log file by checking its size and removing it if it is empty.
+    if not error_message:
+        error_message = f"Unknown error occurred during {action} - {url}"
 
-    Args:
-        log_file: The path to the log file to be checked and possibly deleted.
-
-    Returns:
-        None
-    """
-    logger.info("Checking if the log file '%s' exists.", log_file)
-
-    if os.path.exists(log_file):
-        logger.info("File '%s' exists.", log_file)
-
-        file_size = os.path.getsize(log_file)
-        logger.info("File size of '%s': %d bytes.", log_file, file_size)
-
-        if file_size == 0:
-            try:
-                shutdown_logger()
-                open(log_file, 'w').close()
-                logger.info("Log file '%s' was empty and has been cleared.", log_file)
-            except Exception as e:
-                logger.error("Failed to delete the file '%s': %s", log_file, e)
-        else:
-            logger.info("Log file '%s' is not empty, size: %d bytes.", log_file, file_size)
-    else:
-        logger.warning("Log file '%s' does not exist.", log_file)
-
+    return error_message

@@ -56,7 +56,7 @@ async def simulate_requests() -> None:
         for response in responses:
             content = await response.text()
             # Log the first 30 characters of the response
-            logger.info(f"Received response: {content[:30]}...")
+            logger.info("Received response: %s...", content[:30])
 
     logger.info("Finished all simulated requests.")
 

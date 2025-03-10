@@ -16,7 +16,8 @@ Example usage:
 import logging
 
 
-def get_logger(logger_name: str, log_file: str = 'app.log', log_level: int = logging.INFO) -> logging.Logger:
+def get_logger(logger_name: str, log_file: str = 'app.log',
+               log_level: int = logging.INFO) -> logging.Logger:
     """
     Sets up and returns a logger instance.
 
@@ -50,7 +51,8 @@ def get_logger(logger_name: str, log_file: str = 'app.log', log_level: int = log
     file_handler.setLevel(log_level)
 
     # Formatter
-    formatter = logging.Formatter('%(asctime)s - %(module)s (%(name)s) - %(levelname)s - %(message)s', '%Y-%m-%d %H:%M:%S')
+    formatter = logging.Formatter('%(asctime)s - %(module)s (%(name)s) - '
+                                  '%(levelname)s - %(message)s', '%Y-%m-%d %H:%M:%S')
     console_handler.setFormatter(formatter)
     file_handler.setFormatter(formatter)
 
