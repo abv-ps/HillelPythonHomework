@@ -26,7 +26,7 @@ Functions included in the module:
 import csv
 import re
 import asyncio
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional, List, Dict, Tuple
 
 import requests
@@ -168,7 +168,22 @@ async def parse_news(url: str, date_filter: Tuple[Optional[str], Optional[str]])
         link = item.get('href')
         news_date = details['date']
         news_date_without_time = news_date.split(' ')[0] if news_date else ""
+        if news_date_without_time:
+            news_date_without_time = datetime.strptime(news_date_without_time, "%Y-%m-%d").date()
+
         start_date, end_date = date_filter
+        if start_date:
+            start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+        if end_date:
+            end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+        logger.info("Date of news is %s %s. "
+                    "\nStart date is %s %s. "
+                    "\nEnd date is %s %s. ", news_date_without_time,
+                    isinstance(news_date_without_time, date),
+                    start_date,
+                    isinstance(start_date, date),
+                    end_date,
+                    isinstance(end_date, date))
         if start_date and news_date_without_time <= start_date:
             continue
         if end_date and news_date_without_time > end_date:
@@ -184,6 +199,7 @@ async def parse_news(url: str, date_filter: Tuple[Optional[str], Optional[str]])
             'date_with_time': news_date or '',
             'summary': summary or '',
         })
+        logger.info("News details for news article %s: %s", title, news_date)
     logger.info("Finished fetching news details from %s.", url)
     return news_list
 
@@ -269,7 +285,7 @@ async def main() -> None:
     validator = UserInputValidator()
     date_filter = validator.select_filter_mode()
 
-    for page in range(1, 24):
+    for page in range(1, 3):
         url = f"https://www.rbc.ua/rus/news/{page}"
         news_data = await parse_news(url, date_filter)
         all_news.extend(news_data)
