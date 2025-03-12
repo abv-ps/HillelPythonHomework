@@ -155,6 +155,8 @@ async def parse_news(url: str, date_filter: Tuple[Optional[str], Optional[str]])
     news_items: List[Tag] = []
     if isinstance(newsline, Tag):
         news_items = newsline.find_all('a')
+    logger.info("Found %s news items on %s. "
+                "Starting to fetch details...", len(news_items), url )
     async with aiohttp.ClientSession() as session:
         tasks = [
             fetch_news_details(session, href) for href in (item.get('href') for item in news_items)
@@ -182,6 +184,7 @@ async def parse_news(url: str, date_filter: Tuple[Optional[str], Optional[str]])
             'date_with_time': news_date or '',
             'summary': summary or '',
         })
+    logger.info("Finished fetching news details from %s.", url)
     return news_list
 
 
