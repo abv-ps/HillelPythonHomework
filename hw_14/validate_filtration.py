@@ -36,11 +36,16 @@ Usage:
     4. The method will return the relevant start and end dates
        (if applicable) for filtering the news articles.
 """
-
-
+import asyncio
 import sys
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
+
+import aioconsole
+
+from logger_config import get_logger
+
+logger = get_logger(__name__, "validate_filtration.log")
 
 
 class UserInputValidator:
@@ -64,7 +69,7 @@ class UserInputValidator:
 
     def __init__(self) -> None:
         """
-        Initializes the UserInputValidator with predefined filter modes.
+        Initializes the UserInputValidator with predefined filter modes and messages.
         """
         self.filter_modes = {
             "1": "Filter by a specific date or date range",
@@ -74,124 +79,172 @@ class UserInputValidator:
             "0": "No filtering"
         }
 
-    def get_user_input(self, prompt: str, valid_options: set) -> str:
+        self.prompts = {
+            "select_filter_mode": "Please select a news filtering mode by date: ",
+            "get_days_input": "Enter the number of days (Enter '0' for no filtering, "
+                              "positive integer number",
+            "get_date_input": "Enter the start date (Enter '0' for no filtering, "
+                              "format YYYY-MM-DD): ",
+            "get_date_range_input": "Enter a specific date or a date range "
+                                    "(Enter '0' for no filtering, "
+                                    "format: YYYY-MM-DD, Optional[YYYY-MM-DD]):",
+            "get_date_before_input": "Enter the end date (Enter '0' for no filtering, "
+                                     "format YYYY-MM-DD): "
+        }
+
+    def check_no_filter(self, user_input: str | None) -> bool:
+        """
+        Checks if the user input is "0" (no filtering mode) and prints a message if true.
+
+        Args:
+            user_input (str|None): The user input string.
+
+        Returns:
+            bool: True if the input is "0", otherwise False.
+        """
+        if user_input == "0" or user_input is None:
+            return True
+        return False
+
+    async def get_user_input(self, prompt_key: str) -> Optional[str]:
         """
         Accepts user input and validates it against given options.
 
         Args:
-            prompt (str): The input prompt message.
-            valid_options (set): A set of valid choices.
+            prompt_key (str): The key of the input prompt in the prompts dictionary.
 
         Returns:
-            str: The selected valid choice.
+            Optional[str]: The selected valid choice or None if "0" is selected.
 
         Raises:
             KeyboardInterrupt: If the user interrupts the process.
         """
         try:
+            prompt = self.prompts.get(prompt_key, "")
+            if prompt_key == "select_filter_mode":
+                filter_modes_str = '\n'.join([f"{key}: {value}"
+                                              for key, value in self.filter_modes.items()])
+                prompt = f"{prompt}\n{filter_modes_str}"
             while True:
-                user_input = input(f"{prompt}\nYour choice: ").strip()
-                if user_input in valid_options:
-                    return user_input
-                print(f"Invalid choice. Please select one of the available options: "
-                      f"{list(valid_options)}")
+                user_input = (await aioconsole.ainput(
+                    (f"{prompt}\nYour choice: "))).strip()
+                if self.check_no_filter(user_input):
+                    logger.warning("\nNo filtering mode selected. Exiting filter selection.")
+                    logger.handlers[0].flush()
+                    return None
+                return user_input
         except KeyboardInterrupt:
-            print("\nProcess interrupted. Exiting...")
+            logger.error("\nProcess interrupted by user. Exiting...")
+            sys.exit(0)
+        except asyncio.CancelledError:
+            logger.error("\nInput operation was cancelled.")
             sys.exit(0)
 
-    def get_days_input(self, prompt: str, default: str) -> Optional[str]:
+    async def get_days_input(self, prompt_key: str) -> Optional[str]:
         """
         Gets the number of days for filtering news articles by a date range.
 
         Args:
-            prompt (str): The input prompt message.
-            default (str): The default value if no input is given.
+            prompt_key (str): The key for the prompt message.
 
         Returns:
-            Optional[str]: The calculated start date in 'YYYY-MM-DD' format, or None if no filter.
+            Optional[str]: The calculated start date in 'YYYY-MM-DD' format, or None if "0" is selected.
         """
-        try:
-            days_input = input(f"{prompt} (default: {default}): ").strip() or default
-            days = int(days_input)
-            if days < 0:
-                raise ValueError("Number of days cannot be negative.")
-            start_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
-            return start_date
-        except ValueError as e:
-            print(f"Error: {e}. Please try again.")
-            return self.get_days_input(prompt, default)
+        while True:
+            days_input = await self.get_user_input(prompt_key)
+            if self.check_no_filter(days_input):
+                return None
 
-    def get_date_input(self, prompt: str) -> Optional[str]:
+            try:
+                days: int = int(days_input) - 1
+                if days < 0:
+                    raise ValueError("Number of days cannot be negative.")
+                result = str(((datetime.now() - timedelta(days=days))).strftime("%Y-%m-%d"))
+                logger.info("\nUser selected days range: %s days, "
+                            "calculated start date: %s", days + 1, result)
+                logger.warning("\n[FILTER] Starting to filter news articles for "
+                               "%s days from %s...", days + 1, result)
+                return result
+            except ValueError:
+                logger.error("\nError: %s is not a valid number. ", days_input)
+
+    async def get_date_input(self, prompt_key: str) -> Optional[str]:
         """
         Gets a single date input from the user.
 
         Args:
-            prompt (str): The input prompt message.
+            prompt_key (str): The key for the prompt message.
 
         Returns:
-            Optional[str]: The date string in 'YYYY-MM-DD' format, or None if no input is given.
+            Optional[str]: The date string in 'YYYY-MM-DD' format, or None if "0" is selected.
         """
-        try:
-            date_input = input(f"{prompt} (format YYYY-MM-DD): ").strip()
-            if not date_input:
-                return None
-            datetime.strptime(date_input, "%Y-%m-%d")  # Validate format
-            return date_input
-        except ValueError:
-            print("Invalid date format. Please enter the date in the format YYYY-MM-DD.")
-            return self.get_date_input(prompt)
+        while True:
+            try:
+                date_input = await self.get_user_input(prompt_key)
+                if self.check_no_filter(date_input):
+                    return None
+                datetime.strptime(date_input, "%Y-%m-%d")
+                logger.info("User entered valid date: %s", date_input)
+                logger.warning("\n[FILTER] Starting to filter news articles from %s...  ",
+                               date_input)
+                return date_input
+            except ValueError:
+                logger.error("\nInvalid date format entered: %s", date_input)
 
-    def get_date_range_input(self, prompt: str) -> Tuple[Optional[str], Optional[str]]:
+    async def get_date_range_input(self, prompt_key: str) -> Tuple[Optional[str], Optional[str]]:
         """
         Gets a date range input from the user.
 
         Args:
-            prompt (str): The input prompt message.
+            prompt_key (str): The key for the prompt message.
 
         Returns:
             Tuple[Optional[str], Optional[str]]: A tuple containing start and end dates,
-                                                 or None if no range is given.
+                                                 or None if "0" is selected.
         """
-        try:
-            range_input = input(f"{prompt} (format: YYYY-MM-DD, Optional[YYYY-MM-DD]): ").strip()
-            if not range_input:
+        while True:
+            range_input = await self.get_user_input(prompt_key)
+            if self.check_no_filter(range_input):
                 return None, None
-
-            dates = range_input.split(",")
-            if len(dates) == 1:
-                specific_date = datetime.strptime(dates[0].strip(), "%Y-%m-%d").strftime("%Y-%m-%d")
-                return specific_date, specific_date
-            if len(dates) == 2:
-                start_date = datetime.strptime(dates[0].strip(), "%Y-%m-%d").strftime("%Y-%m-%d")
-                end_date = datetime.strptime(dates[1].strip(), "%Y-%m-%d").strftime("%Y-%m-%d")
+            try:
+                dates = [date.strip() for date in range_input.split(",")]
+                if not (0 < len(dates) <= 2):
+                    raise ValueError("Invalid number of dates provided.")
+                start_date = dates[0]
+                end_date = str((datetime.strptime(dates[-1], "%Y-%m-%d") + timedelta(days=1)
+                                ).strftime("%Y-%m-%d"))
+                logger.info("User selected date range: %s - %s", start_date, end_date)
+                logger.warning("\n[FILTER] Starting to filter news articles from %s "
+                               "to %s...", start_date,
+                               datetime.strptime(dates[-1], "%Y-%m-%d"))
                 return start_date, end_date
-            raise ValueError
-        except ValueError:
-            print("Invalid format. Please enter a date or a date range "
-                  "in the format YYYY-MM-DD, YYYY-MM-DD.")
-            return self.get_date_range_input(prompt)
+            except ValueError:
+                logger.error("Invalid format entered: %s ", range_input)
 
-    def get_date_before_input(self, prompt: str) -> Optional[str]:
+    async def get_date_before_input(self, prompt_key: str) -> Optional[str]:
         """
         Gets a date input for filtering news articles before a specific date.
 
         Args:
-            prompt (str): The input prompt message.
+            prompt_key (str): The key for the prompt message.
 
         Returns:
             Optional[str]: The date string in 'YYYY-MM-DD' format, or None if no input is given.
         """
-        try:
-            date_input = input(f"{prompt} (format YYYY-MM-DD): ").strip()
-            if not date_input:
+        while True:
+            date_input = await self.get_user_input(prompt_key)
+            if self.check_no_filter(date_input):
                 return None
-            datetime.strptime(date_input, "%Y-%m-%d")  # Validate format
-            return date_input
-        except ValueError:
-            print("Invalid date format. Please enter the date in the format YYYY-MM-DD.")
-            return self.get_date_before_input(prompt)
+            try:
+                datetime.strptime(date_input, "%Y-%m-%d")
+                logger.info("\nUser entered valid end date: %s", date_input)
+                logger.warning("\n[FILTER] Starting to filter news articles before %s",
+                               date_input)
+                return date_input
+            except ValueError:
+                logger.error("\nInvalid end date format entered: %s", date_input)
 
-    def select_filter_mode(self) -> Tuple[Optional[str], Optional[str]]:
+    async def select_filter_mode(self) -> Tuple[Optional[str], Optional[str]]:
         """
         Prompts the user to select a filtering mode and retrieves
         the necessary date values for filtering.
@@ -201,23 +254,23 @@ class UserInputValidator:
                                                  the start and end dates for filtering.
                 Either value may be None if no filter is applied.
         """
-        filter_modes_str = '\n'.join([f"{key}: {value}" for key, value
-                                      in self.filter_modes.items()])
+        filter_mode = await self.get_user_input("select_filter_mode")
+        if filter_mode is None:
+            return None, None
+        valid_options = set(self.filter_modes.keys())
+        if filter_mode is None or filter_mode not in valid_options:
+            logger.warning("\nInvalid choice: %s. Valid options: %s",
+                           filter_mode, list(valid_options))
+            return await self.select_filter_mode()
 
-        filter_mode = self.get_user_input(
-            f"Please select a news filtering mode by date: \n{filter_modes_str}",
-            set(self.filter_modes.keys())
-        )
+        logger.info("User selected filter mode: %s", filter_mode)
 
         if filter_mode == "1":
-            return self.get_date_range_input("Enter a specific date or a date range")
+            return await self.get_date_range_input("get_date_range_input")
         if filter_mode == "2":
-            start_date = self.get_days_input("Enter the number of days", "7")
-            return start_date, None
+            return await self.get_days_input("get_days_input"), None
         if filter_mode == "3":
-            start_date = self.get_date_input("Enter the start date")
-            return start_date, None
+            return await self.get_date_input("get_date_input"), None
         if filter_mode == "4":
-            end_date = self.get_date_before_input("Enter the end date for filtering news")
-            return None, end_date
+            return None, await self.get_date_before_input("get_date_before_input")
         return None, None

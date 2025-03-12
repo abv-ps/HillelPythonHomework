@@ -14,10 +14,13 @@ Example usage:
 """
 
 import logging
+import sys
 
 
 def get_logger(logger_name: str, log_file: str = 'app.log',
-               log_level: int = logging.INFO) -> logging.Logger:
+               log_level_console: int = logging.WARNING,
+               log_level_file: int = logging.INFO,
+               file_write: bool = True) -> logging.Logger:
     """
     Sets up and returns a logger instance.
 
@@ -37,27 +40,21 @@ def get_logger(logger_name: str, log_file: str = 'app.log',
         logger = get_logger("my_logger")
         logger.debug("This is a debug message.")
     """
-
-    # Create a logger
     logger = logging.getLogger(logger_name)
-    logger.setLevel(log_level)
+    logger.setLevel(min(log_level_console, log_level_file))
 
-    # Console handler
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(log_level)
-
-    # File handler
-    file_handler = logging.FileHandler(log_file, encoding="utf-8")
-    file_handler.setLevel(log_level)
-
-    # Formatter
     formatter = logging.Formatter('%(asctime)s - %(module)s (%(name)s) - '
                                   '%(levelname)s - %(message)s', '%Y-%m-%d %H:%M:%S')
-    console_handler.setFormatter(formatter)
-    file_handler.setFormatter(formatter)
 
-    # Add handlers to logger
+    console_handler = logging.StreamHandler(sys.stderr)
+    console_handler.setLevel(log_level_console)
+    console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
-    logger.addHandler(file_handler)
+
+    if file_write:
+        file_handler = logging.FileHandler(log_file, encoding="utf-8")
+        file_handler.setLevel(log_level_file)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
 
     return logger
