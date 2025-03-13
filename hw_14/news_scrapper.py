@@ -26,7 +26,7 @@ Functions included in the module:
 import csv
 import re
 import asyncio
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional, List, Dict, Tuple, Any
 
 import requests
@@ -393,7 +393,7 @@ async def main() -> None:
     validator = UserInputValidator()
     date_filter = await validator.select_filter_mode()
 
-    for page in range(1, 7):
+    for page in range(1, 24):
         url = f"https://www.rbc.ua/rus/news/{page}"
         news_data = await parse_news(url, date_filter)
         all_news.extend(news_data)
