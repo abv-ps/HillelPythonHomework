@@ -129,7 +129,8 @@ class UserInputValidator:
                 user_input = (await aioconsole.ainput(
                     (f"{prompt}\nYour choice: "))).strip()
                 if self.check_no_filter(user_input):
-                    logger.warning("\nNo filtering mode selected. Exiting filter selection.")
+                    logger.warning("\nNo filtering mode selected. Exiting filter selection."
+                                   "\nStarting to scrape the news...")
                     logger.handlers[0].flush()
                     return None
                 return user_input
