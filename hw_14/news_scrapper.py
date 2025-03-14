@@ -24,14 +24,16 @@ Functions included in the module:
    and saves the results.
 """
 import csv
-import re
 import asyncio
-from datetime import datetime, date
-from typing import Optional, List, Dict, Tuple, Any
+import aiohttp
+import re
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, Optional, List, Tuple, Any
+from config import Config
 
 import requests
-import aiohttp
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup, Tag, FeatureNotFound
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -149,8 +151,7 @@ def is_within_date_range(news_date: Optional[datetime], start_date: Optional[str
     return True
 
 
-async def fetch_news_details(session: aiohttp.ClientSession, link: str) -> (
-        Dict)[Optional[str], Optional[str]]:
+async def fetch_news_details(session: aiohttp.ClientSession, link: str) -> Dict[str, Optional[str]]:
     """
     Fetches details of a news article asynchronously.
 
@@ -164,19 +165,37 @@ async def fetch_news_details(session: aiohttp.ClientSession, link: str) -> (
     """
     try:
         async with session.get(link) as response:
+            response.raise_for_status()
+
             html = await response.text()
-            soup = BeautifulSoup(html, 'html.parser')
+
+            try:
+                soup = BeautifulSoup(html, 'html.parser')
+            except FeatureNotFound as bs_err:
+                error_message = handle_action_error(link, "parsing HTML", error=bs_err)
+                logger.error(error_message)
+                return {'date': None, 'summary': None}
+
             time_tag = soup.find('div', class_=re.compile("time"))
-            if time_tag:
-                date = convert_date(time_tag.get_text(strip=True))
-            else:
-                date = datetime.now().strftime('%Y-%m-%d %H:%M')
+            date = convert_date(time_tag.get_text(strip=True)) if time_tag else datetime.now().strftime(
+                '%Y-%m-%d %H:%M')
+
             summary_tag = soup.find('div', class_='publication-lead')
             summary = summary_tag.get_text(strip=True) if summary_tag else "No summary"
+
             return {'date': date, 'summary': summary}
+    except aiohttp.ClientResponseError as http_err:
+        error_message = handle_action_error(link, "fetching news details",
+                                            error=http_err, status_code=http_err.status)
+        logger.error(error_message)
+    except aiohttp.ClientError as http_err:
+        error_message = handle_action_error(link, "fetching news details", error=http_err)
+        logger.error(error_message)
     except Exception as e:
-        logger.error("Error fetching details for %s: %s", link, e)
-        return {'date': None, 'summary': None}
+        error_message = handle_action_error(link, "fetching news details", error=e)
+        logger.error(error_message)
+
+    return {'date': None, 'summary': None}
 
 
 async def parse_news(url: str, date_filter: Tuple[Optional[str], Optional[str]]) -> (
@@ -221,7 +240,7 @@ def extract_news_items(soup: BeautifulSoup, url: str) -> List[Tag]:
     if not newsline:
         logger.warning("No newsline found on %s", url)
         return []
-    return newsline.find_all('a') if isinstance(newsline, Tag) else []
+    return newsline.find_all('a')
 
 
 async def fetch_news_details_batch(news_items: List[Tag]) -> List[Dict[str, Any]]:
@@ -263,14 +282,14 @@ def process_news_items(news_items: List[Tag], news_details: List[Dict[str, Any]]
     news_list = []
     for item, details in zip(news_items, news_details):
         title = re.sub(r"^\d{2}:\d{2}\s*", "", item.get_text(strip=True))
-        link = clean_link(item.get('href', ''))
+        link = clean_string(item.get('href', ''))
         news_date_str = str(details.get('date', ''))
         news_date = parse_date(news_date_str.split(' ')[0] if news_date_str else "")
 
         if not is_within_date_range(news_date, *date_filter):
             continue
 
-        summary = clean_summary(details.get('summary', ''))
+        summary = clean_string(details.get('summary', ''))
         news_list.append({
             'title': title,
             'link': link,
@@ -282,34 +301,28 @@ def process_news_items(news_items: List[Tag], news_details: List[Dict[str, Any]]
     return news_list
 
 
-def clean_link(link: Any) -> str:
+def clean_string(value: Any) -> str:
     """
-    Ensures the link is a valid string.
+    Cleans and ensures that the input value is a valid string.
+
+    If the input is a string, it is stripped of leading and trailing whitespace.
+    If the input is a list, each element is stripped and then joined into a single string.
+    If the input is neither a string nor a list, an empty string is returned.
 
     Args:
-        link (Any): The link to be cleaned, can be a string or list.
+        value (Any): The input value to be cleaned,
+        which can be a string or a list of strings.
 
     Returns:
-        str: A valid string representing the link.
+        str: A cleaned string, either from the input string or a concatenated string
+             from the list, or an empty string if the input is neither.
     """
-    if isinstance(link, list):
-        return " ".join(link) if link else ""
-    return link if isinstance(link, str) else ""
-
-
-def clean_summary(summary: Any) -> str:
-    """
-    Ensures the summary is a valid string.
-
-    Args:
-        summary (Any): The summary to be cleaned, can be a string or list.
-
-    Returns:
-        str: A valid string representing the summary.
-    """
-    if isinstance(summary, list):
-        return " ".join(summary) if summary else ""
-    return summary if isinstance(summary, str) else ""
+    if isinstance(value, str):
+        return value.strip()
+    elif isinstance(value, list):
+        return " ".join(map(str.strip, value))
+    else:
+        return ""
 
 
 def save_to_csv(data: List[Dict[str, str]], filename: str = 'news.csv') -> None:
@@ -339,12 +352,41 @@ def save_to_csv(data: List[Dict[str, str]], filename: str = 'news.csv') -> None:
         logger.error(error_message)
 
 
-def generate_news_statistics(news_list: List[Dict[str, str]]) -> None:
+def get_next_plot_filename(directory: Path) -> Path:
+    """
+    Finds the next available filename for saving a plot in the given directory.
+
+    This function looks for existing PNG files in the specified directory,
+    extracts the numeric part of their filenames, and returns the next available
+    filename by incrementing the highest number found.
+
+    Args:
+        directory (Path): The directory where the plot will be saved.
+
+    Returns:
+        Path: The next available filename as a Path object.
+    """
+    directory.mkdir(parents=True, exist_ok=True)
+
+    existing_files = {
+        int(p.stem.split(", ")[1])
+        for p in directory.glob("plot, *.png")
+        if p.stem.split(", ")[1].isdigit()
+    }
+
+    next_index = max(existing_files, default=0) + 1
+
+    return directory / f"plot, {next_index}.png"
+
+
+def generate_news_statistics(news_list: List[Dict[str, str]],
+                             save_path: Optional[Path] = None) -> None:
     """
     Generates and displays statistics about the collected news articles.
 
     Args:
         news_list (List[Dict[str, str]]): List of dictionaries containing news details.
+        save_path (Optional[Path]): Path to save the plot instead of displaying it.
 
     Returns:
         None
@@ -357,11 +399,10 @@ def generate_news_statistics(news_list: List[Dict[str, str]]) -> None:
 
     if 'date_with_time' not in df.columns:
         logger.error("Missing 'date_with_time' column in DataFrame.")
-        logger.error("Available columns: %s", df.columns)
+        logger.error("Available columns: %s", list(df.columns))
         return
 
-    df['date_with_time'] = pd.to_datetime(df['date_with_time'],
-                                          format='%Y-%m-%d %H:%M', errors='coerce')
+    df['date_with_time'] = pd.to_datetime(df['date_with_time'], format='%Y-%m-%d %H:%M', errors='coerce')
     df['date'] = df['date_with_time'].dt.date
 
     if df['date'].isna().all():
@@ -373,13 +414,22 @@ def generate_news_statistics(news_list: List[Dict[str, str]]) -> None:
     print("News statistics by date:")
     print(stats)
 
-    ax = stats.plot(x='date', y='count', kind='bar', title='News Count by Date')
+    ax = stats.plot(x='date', y='count', kind='bar', title='News Count by Date', legend=False)
 
     for i, v in enumerate(stats['count']):
         ax.text(i, v + 0.1, str(v), ha='center', va='bottom')
 
     plt.xticks(rotation=35, ha='right', fontsize=7)
-    plt.show()
+
+    if save_path:
+        save_path = Path(save_path)
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path, bbox_inches='tight')
+        logger.info("Plot saved to %s", save_path)
+    else:
+        plt.show()
+
+    plt.close()
 
 
 async def main() -> None:
@@ -393,13 +443,14 @@ async def main() -> None:
     validator = UserInputValidator()
     date_filter = await validator.select_filter_mode()
 
-    for page in range(1, 24):
-        url = f"https://www.rbc.ua/rus/news/{page}"
+    for page in range(Config.PAGE_RANGE[0], Config.PAGE_RANGE[1]):
+        url = Config.BASE_URL.format(page=page)
         news_data = await parse_news(url, date_filter)
         all_news.extend(news_data)
 
     save_to_csv(all_news)
-    generate_news_statistics(all_news)
+    plot_path = get_next_plot_filename(Path(Config.PLOT_DIR))
+    generate_news_statistics(all_news, save_path=plot_path)
 
 
 if __name__ == '__main__':

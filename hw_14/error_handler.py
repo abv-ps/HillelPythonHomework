@@ -57,8 +57,10 @@ Key Components:
         utility function. The log captures the details of the action, URL,
         error type, status code, or file-related error details.
 """
-
+import csv
 from typing import Optional
+import aiohttp
+from bs4 import FeatureNotFound
 import requests
 from logger_config import get_logger
 
@@ -96,27 +98,33 @@ def handle_action_error(url: str, action: str,
     """
     error_message = None
 
-    if error:
-        if isinstance(error, requests.ConnectionError):
-            error_message = f"Connection error while {action} {url}, Status: {error}"
-            logger.error(error_message)
-        if isinstance(error, requests.Timeout):
-            error_message = f"Timeout error while {action} {url}, Status: {error}"
-            logger.error(error_message)
-        if isinstance(error, requests.HTTPError):
-            error_message = f"Response error while {action} {url}, Status: {error}"
-            logger.error(error_message)
-        if isinstance(error, requests.RequestException):
-            error_message = f"Payload error while {action} {url}, Status: {error}"
-            logger.error(error_message)
-        error_message = f"Unexpected error while {action} {url}, Status: {error}"
-        logger.error(error_message)
-
     if status_code and not error_message:
         error_message = status_messages.get(status_code,
-                                            f"Failed with status {status_code} "
-                                            f"during {action} - {url}")
+                                            f"Failed with status {status_code} during {action} - {url}")
         logger.warning("%s - Status Code: %s - %s", url, status_code, error_message)
+
+    if error:
+        if isinstance(error, aiohttp.ClientError):
+            error_message = f"HTTP client error while {action} {url}, Status: {error}"
+            logger.error(error_message)
+        elif isinstance(error, requests.ConnectionError):
+            error_message = f"Connection error while {action} {url}, Status: {error}"
+            logger.error(error_message)
+        elif isinstance(error, requests.Timeout):
+            error_message = f"Timeout error while {action} {url}, Status: {error}"
+            logger.error(error_message)
+        elif isinstance(error, requests.HTTPError):
+            error_message = f"Response error while {action} {url}, Status: {error}"
+            logger.error(error_message)
+        elif isinstance(error, requests.RequestException):
+            error_message = f"Payload error while {action} {url}, Status: {error}"
+            logger.error(error_message)
+        elif isinstance(error, FeatureNotFound):
+            error_message = f"BeautifulSoup parser error while {action} {url}, Status: {error}"
+            logger.error(error_message)
+        else:
+            error_message = f"Unexpected error while {action} {url}, Status: {error}"
+            logger.error(error_message)
 
     if not error_message:
         error_message = f"Unknown error occurred during {action} - {url}"
@@ -149,6 +157,18 @@ def handle_file_error(action: str, file_path: str, error: Exception) -> str:
         logger.error(error_message)
     elif isinstance(error, OSError):
         error_message = f"Operating system error while {action} {file_path}, Error: {error}"
+        logger.error(error_message)
+    elif isinstance(error, IOError):
+        error_message = f"I/O error while {action} {file_path}, Error: {error}"
+        logger.error(error_message)
+    elif isinstance(error, ValueError):
+        error_message = f"Value error while {action} {file_path}, Error: {error}"
+        logger.error(error_message)
+    elif isinstance(error, csv.Error):
+        error_message = f"CSV error while {action} {file_path}, Error: {error}"
+        logger.error(error_message)
+    elif isinstance(error, UnicodeDecodeError):
+        error_message = f"Unicode decode error while {action} {file_path}, Error: {error}"
         logger.error(error_message)
     else:
         error_message = f"Unexpected file error while {action} {file_path}, Error: {error}"
